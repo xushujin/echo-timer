@@ -106,32 +106,24 @@ jobs:
           sha256sum "$APK" | tee "$APK.sha256"
 
       - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/dist/EchoTimer-v*.apk
+            build/dist/EchoTimer-v*.apk.sha256
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      - name: Verify release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="$GITHUB_REF_NAME"
-          APK_FILE="$(ls build/dist/EchoTimer-v*.apk | head -n 1)"
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            # 已存在（例如手动建过）时只补传产物，避免 "release already exists" 导致整次失败
-            echo "release $TAG 已存在，上传产物并覆盖同名文件"
-            gh release upload "$TAG" \
-              "$APK_FILE" \
-              "$APK_FILE.sha256" \
-              --clobber
-          else
-            gh release create "$TAG" \
-              "$APK_FILE" \
-              "$APK_FILE.sha256" \
-              --title "EchoTimer $TAG" \
-              --generate-notes
-          fi
-
-          # 发布自检：产物必须真的出现在 Release 里，否则直接失败（避免"构建成功但没 APK"）
-          ls -l build/dist
-          gh release view "$TAG" --json assets \
-            --template '{{range .assets}}{{.name}}{{"\n"}}{{end}}' | tee /tmp/release-assets.txt
-          if ! grep -q '\.apk$' /tmp/release-assets.txt; then
-            echo "::error::Release $TAG 里没有 APK 资产"
-            exit 1
-          fi
+          mkdir -p /tmp/verify
+          gh release download "$GITHUB_REF_NAME" \
+            --pattern "*.apk*" \
+            --dir /tmp/verify --clobber
+          ls -l /tmp/verify
+          test -n "$(ls /tmp/verify/*.apk)"
+          # 下载回来的包必须能通过签名校验，确保 Release 里的就是刚构建的那份
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs /tmp/verify/*.apk | head -n 3

@@ -214,7 +214,7 @@ $ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs build/dist/EchoT
 | 同上 | `ECHO_KEY_ALIAS` | key 别名（如 `echotimer`） |
 | 同上 | `ECHO_KEY_PASSWORD` | key 口令（用 keytool 生成时一般与 keystore 口令相同） |
 | Settings → Actions → General → Workflow permissions | 权限 | **Read and write permissions**（`gh release create` 需要） |
-| Settings → Actions → General → Actions permissions | 允许的动作 | 允许 `actions/checkout`、`actions/setup-java` |
+| Settings → Actions → General → Actions permissions | 允许的动作 | 允许 `actions/checkout`、`actions/setup-java`、`softprops/action-gh-release` |
 
 生成 keystore 与 base64（不要提交 `.jks`，务必备份）：
 
