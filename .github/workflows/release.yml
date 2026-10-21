@@ -30,11 +30,33 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # 不用 android-actions/setup-android：它会执行 sdkmanager tools，而 tools 包已下架，
+      # 在新版 cmdline-tools 上必然失败（Failed to find package 'tools'）。这里直接装配 SDK。
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          # runner 镜像自带 cmdline-tools/16.0；没有时下载一份
+          if [ ! -d "$ANDROID_SDK_ROOT/cmdline-tools" ]; then
+            mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+            curl -sSL -o /tmp/cmdline-tools.zip \
+              https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+            unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools
+            mv /tmp/cmdline-tools/cmdline-tools "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          fi
+          for dir in "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin; do
+            echo "$dir" >> "$GITHUB_PATH"
+          done
 
       - name: Install SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          set -euo pipefail
+          sdkmanager --version
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Verify tag matches versionName
         run: |
