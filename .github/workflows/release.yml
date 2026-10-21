@@ -34,10 +34,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install SDK packages
-        run: |
-          set -euo pipefail
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Verify tag matches versionName
         run: |
@@ -86,13 +83,23 @@ jobs:
           unzip -l "$APK" | head -n 20
           sha256sum "$APK" | tee "$APK.sha256"
 
-      - name: Create GitHub Release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" \
-            build/dist/EchoTimer.apk \
-            build/dist/EchoTimer.apk.sha256 \
-            --title "EchoTimer ${GITHUB_REF_NAME}" \
-            --generate-notes
+          TAG="$GITHUB_REF_NAME"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # 已存在（例如手动建过）时只补传产物，避免 "release already exists" 导致整次失败
+            echo "release $TAG 已存在，上传产物并覆盖同名文件"
+            gh release upload "$TAG" \
+              build/dist/EchoTimer.apk \
+              build/dist/EchoTimer.apk.sha256 \
+              --clobber
+          else
+            gh release create "$TAG" \
+              build/dist/EchoTimer.apk \
+              build/dist/EchoTimer.apk.sha256 \
+              --title "EchoTimer $TAG" \
+              --generate-notes
+          fi
