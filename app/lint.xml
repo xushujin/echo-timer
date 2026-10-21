@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!--
+      adaptive-icon 必须放在 -v26 目录里，AAPT 不接受 mipmap-anydpi（无版本限定）中的
+      <adaptive-icon>；虽然 minSdk 已是 26，这条 ObsoleteSdkInt 提示属于误报。
+    -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+</lint>

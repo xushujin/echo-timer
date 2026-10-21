@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# 签名材料：绝不入库
+keystore.properties
+*.jks
+*.keystore
+release-keystore/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# 构建产物
+*.apk
+*.aab
+*.ap_
+
+# 本地工具数据
+.workbuddy-ai/
+
+# 密钥转储
+*.b64

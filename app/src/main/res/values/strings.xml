@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EchoTimer</string>
+    <string name="app_tagline">语音播报秒表</string>
+
+    <!-- 底部导航 -->
+    <string name="tab_timer">计时</string>
+    <string name="tab_history">记录</string>
+    <string name="tab_settings">设置</string>
+    <string name="tab_about">关于</string>
+
+    <!-- 计时页 -->
+    <string name="timer_state_idle">待开始</string>
+    <string name="timer_state_running">计时中</string>
+    <string name="timer_state_paused">已暂停</string>
+    <string name="timer_state_finished">已结束</string>
+    <string name="timer_next_mark">播报点 %1$s</string>
+    <string name="timer_announce_off">定时播报已关闭</string>
+    <string name="timer_idle_hint">说「开始」或点击开始</string>
+    <string name="timer_action_start">开始</string>
+    <string name="timer_action_pause">暂停</string>
+    <string name="timer_action_resume">继续</string>
+    <string name="timer_action_lap">计次</string>
+    <string name="timer_action_finish">结束</string>
+    <string name="timer_action_reset">重置</string>
+    <string name="timer_saved_hint">已保存到历史 · %1$s</string>
+    <string name="timer_laps_title">计次记录</string>
+    <string name="timer_laps_count">%1$d 次计次</string>
+    <string name="timer_lap_item">第 %1$d 次</string>
+    <string name="timer_lap_empty">还没有计次。运行中点「计次」记录分段。</string>
+
+    <!-- 语音状态 -->
+    <string name="voice_off">语音指令已关闭 · 点击开启</string>
+    <string name="voice_listening">正在听 · 说「开始」或「结束」</string>
+    <string name="voice_suspended">播报中，麦克风暂让</string>
+    <string name="voice_no_permission">需要麦克风权限</string>
+    <string name="voice_unavailable">未检测到语音识别服务</string>
+    <string name="voice_error">语音识别异常，点击重试</string>
+    <string name="voice_permission_rationale">语音指令需要麦克风权限，仅用于识别「开始」「结束」等口令，音频不会被保存或上传。</string>
+    <string name="voice_unavailable_title">未检测到语音识别服务</string>
+    <string name="voice_unavailable_body">EchoTimer 用系统提供的语音识别服务把口令转成文字，自己不做离线识别。\n\n当前设备上检测到 %1$d 个识别服务。国产手机通常不预装 Google 语音服务，第三方应用因此无法调用语音识别。\n\n可以尝试：\n· 安装 Google 语音服务（需要 GMS 环境）\n· 在系统设置的「语音输入 / 语音助手」里启用厂商自带的识别服务\n\n装好后回到本页会自动重新检测。按钮操作和语音播报不受影响。</string>
+    <string name="voice_unavailable_open_settings">打开语音设置</string>
+    <string name="voice_unavailable_close">知道了</string>
+
+    <!-- 历史页 -->
+    <string name="history_title">历史记录</string>
+    <string name="history_count">共 %1$d 条</string>
+    <string name="history_empty_title">还没有记录</string>
+    <string name="history_empty_body">结束一次计时后会自动保存到这里。</string>
+    <string name="history_expand">展开计次</string>
+    <string name="history_collapse">收起</string>
+    <string name="history_rename">重命名</string>
+    <string name="history_delete">删除</string>
+    <string name="history_delete_title">删除这条记录？</string>
+    <string name="history_delete_body">删除后不可恢复。</string>
+    <string name="history_rename_title">重命名记录</string>
+    <string name="history_rename_hint">例如：晨跑</string>
+    <string name="action_confirm">确定</string>
+    <string name="action_cancel">取消</string>
+
+    <!-- 天梯榜 -->
+    <string name="tab_leaderboard">天梯</string>
+    <string name="leaderboard_title">天梯榜</string>
+    <string name="leaderboard_count">共 %1$d 个榜单</string>
+    <string name="leaderboard_empty_title">还没有榜单</string>
+    <string name="leaderboard_empty_body">新建一个榜单，输入姓名开始记录成绩。</string>
+    <string name="leaderboard_create">新建榜单</string>
+    <string name="leaderboard_create_title">新建榜单</string>
+    <string name="leaderboard_create_hint">榜单名称（不可重名）</string>
+    <string name="leaderboard_name_empty">名称不能为空</string>
+    <string name="leaderboard_name_too_long">名称最长 %1$d 个字符</string>
+    <string name="leaderboard_name_taken">已有同名榜单</string>
+    <string name="leaderboard_players">%1$d 人</string>
+    <string name="leaderboard_best">最佳 %1$s</string>
+    <string name="leaderboard_no_score">暂无成绩</string>
+    <string name="leaderboard_delete">删除榜单</string>
+    <string name="leaderboard_delete_title">删除这个榜单？</string>
+    <string name="leaderboard_delete_body">榜单和全部成绩都会删除，不可恢复。</string>
+    <string name="leaderboard_back">返回</string>
+    <string name="leaderboard_start">开始挑战</string>
+    <string name="leaderboard_manual">手工录入</string>
+    <string name="leaderboard_manual_title">手工录入成绩</string>
+    <string name="leaderboard_manual_name">姓名</string>
+    <string name="leaderboard_manual_time">成绩</string>
+    <string name="leaderboard_manual_time_hint">如 12.34 或 1:23.45</string>
+    <string name="leaderboard_manual_time_invalid">格式不对：试试 12.34 或 1:23.45</string>
+    <string name="leaderboard_manual_submit">录入</string>
+    <string name="action_close">关闭</string>
+    <string name="leaderboard_start_sub">输入或选择姓名后开始；本模式不计次</string>
+    <string name="leaderboard_start_title">输入姓名</string>
+    <string name="leaderboard_start_hint">姓名</string>
+    <string name="leaderboard_existing_players">已有选手</string>
+    <string name="leaderboard_entries_title">成绩 · 按秒数降序</string>
+    <string name="leaderboard_entries_empty">还没有成绩，点「开始挑战」记录第一个。</string>
+    <string name="leaderboard_rank">%1$d</string>
+    <string name="leaderboard_entry_delete">删除成绩</string>
+    <string name="leaderboard_entry_delete_title">删除这条成绩？</string>
+    <string name="leaderboard_entry_delete_body">%1$s · %2$s 会从榜单中移除，不可恢复。</string>
+    <string name="challenge_pause">暂停</string>
+    <string name="challenge_resume">继续</string>
+    <string name="challenge_finish">结束</string>
+    <string name="challenge_hint">本模式不计次</string>
+    <string name="challenge_submitting">正在保存…</string>
+    <string name="challenge_result_new">新纪录！%1$s</string>
+    <string name="challenge_result_improved">刷新纪录！%1$s（原 %2$s）</string>
+    <string name="challenge_result_kept">未超过最佳 %1$s</string>
+    <string name="challenge_back_to_board">返回榜单</string>
+    <string name="challenge_discard_title">放弃本次挑战？</string>
+    <string name="challenge_discard_body">本次计时不会记录到榜单。</string>
+    <string name="challenge_discard_confirm">放弃</string>
+
+    <!-- 设置页 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_appearance">外观</string>
+    <string name="settings_palette">配色主题</string>
+    <string name="settings_theme_mode">明暗模式</string>
+    <string name="settings_mode_system">跟随系统</string>
+    <string name="settings_mode_light">浅色</string>
+    <string name="settings_mode_dark">深色</string>
+    <string name="settings_section_announce">定时播报</string>
+    <string name="settings_announce_enabled">定时语音播报</string>
+    <string name="settings_announce_enabled_sub">计时过程中，在设定的时间点播报当前时长</string>
+    <string name="settings_intervals">播报间隔</string>
+    <string name="settings_intervals_hint">每隔 N 秒播报一次当前时长：选 1 秒就是每秒报一次，选 5 秒就是在 5s、10s、15s… 各报一次。</string>
+    <string name="settings_interval_preview">当前设置：每 %1$s 播报一次（%2$s）</string>
+    <string name="settings_voice_unavailable_hint">当前设备未检测到系统语音识别服务，语音指令不可用。点击上方开关可查看详情。</string>
+    <string name="settings_test_speak">测试播报</string>
+    <string name="settings_test_speak_sub">立即播放一段示例语音</string>
+    <string name="settings_test_speak_action">试听</string>
+    <string name="settings_tts_missing">系统缺少可用的语音包，播报不可用</string>
+    <string name="settings_section_voice">语音指令</string>
+    <string name="settings_voice_enabled">语音指令</string>
+    <string name="settings_voice_enabled_sub">说「开始」开始计时，说「结束」结束并保存</string>
+    <string name="settings_voice_permission">麦克风权限</string>
+    <string name="settings_granted">已授权</string>
+    <string name="settings_grant">去授权</string>
+    <string name="settings_voice_language">识别语言</string>
+    <string name="settings_section_other">其他</string>
+    <string name="settings_auto_save">结束后自动保存</string>
+    <string name="settings_keep_screen_on">计时时保持屏幕常亮</string>
+    <string name="settings_speak_start_stop">播报开始 / 暂停 / 结束</string>
+    <string name="settings_reset">恢复默认设置</string>
+
+    <!-- 关于页 -->
+    <string name="about_title">关于</string>
+    <string name="about_version">版本 %1$s（build %2$d）</string>
+    <string name="about_section_stack">技术栈</string>
+    <string name="about_stack_language">语言</string>
+    <string name="about_stack_language_value">Kotlin %1$s</string>
+    <string name="about_stack_ui">界面</string>
+    <string name="about_stack_ui_value">Jetpack Compose · BOM %1$s</string>
+    <string name="about_stack_build">构建</string>
+    <string name="about_stack_build_value">Gradle %1$s · AGP %2$s</string>
+    <string name="about_stack_storage">存储</string>
+    <string name="about_stack_storage_value">自研 SQLite 数据层（显式迁移）</string>
+    <string name="about_stack_voice">语音</string>
+    <string name="about_stack_voice_value">系统 TTS + SpeechRecognizer，无第三方语音库</string>
+    <string name="about_section_support">支持范围</string>
+    <string name="about_support_os">系统：Android 8.0（API 26）至 Android 15（API 35）。</string>
+    <string name="about_support_locale">语言：中文界面与中文播报；英文口令（start / stop 等）同样可识别。</string>
+    <string name="about_support_tts">播报依赖系统 TTS 引擎，通常可离线使用；若系统未安装中文语音包，会自动回退到默认语言。</string>
+    <string name="about_support_network">语音识别由系统识别服务提供，离线能力取决于该服务；若设备未安装此类服务，语音指令不可用，可继续用按钮操作。</string>
+    <string name="about_section_permissions">权限说明</string>
+    <string name="about_perm_mic">麦克风（RECORD_AUDIO）</string>
+    <string name="about_perm_mic_desc">仅用于识别「开始」「结束」等语音指令。应用不录音、不保存音频、不上传音频。</string>
+    <string name="about_perm_internet">网络（INTERNET）</string>
+    <string name="about_perm_internet_desc">系统语音识别服务进行在线识别时需要联网。应用本身不上传任何数据。</string>
+    <string name="about_section_data">数据与隐私</string>
+    <string name="about_data_body">计时记录保存在本机 SQLite 数据库，卸载即清除。没有账号体系，没有云端同步，没有统计埋点。</string>
+    <string name="about_section_licenses">开源说明</string>
+    <string name="about_licenses_body">仅使用 AndroidX / Jetpack Compose 官方库；未引入第三方 UI 库、依赖注入框架或语音识别库。</string>
+</resources>

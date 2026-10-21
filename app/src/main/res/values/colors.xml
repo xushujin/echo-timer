@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 启动窗口背景，与默认配色（石墨·浅色）一致，避免冷启动白闪。 -->
+    <color name="window_background">#E9ECF1</color>
+    <color name="ic_launcher_background">#22262C</color>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 及以下的自动备份范围：只备份计时数据库与设置。 -->
+<full-backup-content>
+    <include domain="database" path="echotimer.db" />
+    <include domain="sharedpref" path="echotimer_settings.xml" />
+</full-backup-content>

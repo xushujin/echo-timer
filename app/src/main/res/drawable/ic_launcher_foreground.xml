@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 外圈：回声环 -->
+    <path
+        android:pathData="M54,31 A23,23 0 1,0 54,77 A23,23 0 1,0 54,31 Z"
+        android:strokeColor="#7AA2FF"
+        android:strokeWidth="5" />
+    <!-- 内圈：更淡的回声 -->
+    <path
+        android:pathData="M54,39 A15,15 0 1,0 54,69 A15,15 0 1,0 54,39 Z"
+        android:strokeColor="#7AA2FF"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.45" />
+    <!-- 播放三角 -->
+    <path
+        android:fillColor="#7AA2FF"
+        android:pathData="M49,45 L64,54 L49,63 Z" />
+</vector>
