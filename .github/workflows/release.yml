@@ -129,7 +129,8 @@ jobs:
 
           # 发布自检：产物必须真的出现在 Release 里，否则直接失败（避免"构建成功但没 APK"）
           ls -l build/dist
-          gh release view "$TAG" --json assets --jq -r '.assets[].name' | tee /tmp/release-assets.txt
+          gh release view "$TAG" --json assets \
+            --template '{{range .assets}}{{.name}}{{"\n"}}{{end}}' | tee /tmp/release-assets.txt
           if ! grep -q '\.apk$' /tmp/release-assets.txt; then
             echo "::error::Release $TAG 里没有 APK 资产"
             exit 1
