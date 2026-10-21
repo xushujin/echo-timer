@@ -373,7 +373,10 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
 
 - Kotlin：`compilerOptions { allWarningsAsErrors.set(true) }`，任何警告即构建失败。
 - Lint：`warningsAsErrors = true`、`abortOnError = true`，`lintDebug` / `lintRelease` 均输出 `No issues found.`
-- `app/lint.xml` 仅对 `mipmap-anydpi-v26` 目录忽略 `ObsoleteSdkInt`：AAPT 不接受无版本限定的 `mipmap-anydpi` 里的 `<adaptive-icon>`，该提示属于误报。
+- `app/lint.xml` 有两条显式忽略，都写明原因：
+  - `ObsoleteSdkInt`（仅 `mipmap-anydpi-v26`）：AAPT 要求 `<adaptive-icon>` 放在带版本限定的目录，该提示属于误报。
+  - `OldTargetApi`：项目有意停在 `targetSdk = 35`（按 35 适配并验证）。CI 镜像常预装更新的 platform，
+    lint 会报"未使用最新 API"，这里忽略；升级 targetSdk 时删掉这条即可重新看到提示。
 
 ### 单元测试（64 个，全部通过）
 
