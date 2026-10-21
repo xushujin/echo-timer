@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           sdkmanager --version
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Verify tag matches versionName
         run: |
@@ -97,11 +97,11 @@ jobs:
       - name: Verify APK (signature, manifest, permissions)
         run: |
           set -euo pipefail
-          APK="build/dist/EchoTimer.apk"
+          APK="$(ls build/dist/EchoTimer-v*.apk | head -n 1)"
           echo "APK=$APK"
-          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/36.0.0/apksigner)"
           "$APKSIGNER" verify --print-certs "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK" | head -n 20
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$APK" | head -n 20
           unzip -l "$APK" | head -n 20
           sha256sum "$APK" | tee "$APK.sha256"
 
@@ -111,17 +111,18 @@ jobs:
         run: |
           set -euo pipefail
           TAG="$GITHUB_REF_NAME"
+          APK_FILE="$(ls build/dist/EchoTimer-v*.apk | head -n 1)"
           if gh release view "$TAG" > /dev/null 2>&1; then
             # 已存在（例如手动建过）时只补传产物，避免 "release already exists" 导致整次失败
             echo "release $TAG 已存在，上传产物并覆盖同名文件"
             gh release upload "$TAG" \
-              build/dist/EchoTimer.apk \
-              build/dist/EchoTimer.apk.sha256 \
+              "$APK_FILE" \
+              "$APK_FILE.sha256" \
               --clobber
           else
             gh release create "$TAG" \
-              build/dist/EchoTimer.apk \
-              build/dist/EchoTimer.apk.sha256 \
+              "$APK_FILE" \
+              "$APK_FILE.sha256" \
               --title "EchoTimer $TAG" \
               --generate-notes
           fi

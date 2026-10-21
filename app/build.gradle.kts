@@ -46,12 +46,12 @@ if (isCi && isReleaseTaskRequested && !hasReleaseSigning) {
 
 android {
     namespace = "com.echotimer"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.echotimer"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
         // 关于页展示的技术栈版本，全部来自构建脚本，避免文档与代码各写一份。
@@ -174,14 +174,14 @@ val prepareDistDir by tasks.registering {
 
 val distReleaseApk by tasks.registering(Sync::class) {
     group = "distribution"
-    description = "把 release APK 同步为 build/dist/EchoTimer.apk"
+    description = "把 release APK 同步为 build/dist/EchoTimer-v<version>.apk"
     dependsOn("assembleRelease", prepareDistDir)
     from(layout.buildDirectory.dir("outputs/apk/release")) {
         include("*.apk")
         exclude("*-unsigned.apk")
     }
     into(distDir)
-    rename { "EchoTimer.apk" }
+    rename { "EchoTimer-v$appVersionName.apk" }
     // debug 产物放在 dist/debug 下，这里保留它，避免两种产物互相清理。
     preserve { include("debug/**") }
     // 目标目录每次都被 prepareDistDir 清过，这里不做增量判断，保证一定重新复制。
@@ -190,11 +190,11 @@ val distReleaseApk by tasks.registering(Sync::class) {
 
 val distDebugApk by tasks.registering(Sync::class) {
     group = "distribution"
-    description = "把 debug APK 同步为 build/dist/debug/EchoTimer-debug.apk"
+    description = "把 debug APK 同步为 build/dist/debug/EchoTimer-v<version>-debug.apk"
     dependsOn("assembleDebug")
     from(layout.buildDirectory.dir("outputs/apk/debug")) {
         include("*.apk")
     }
     into(distDir.map { it.dir("debug") })
-    rename { "EchoTimer-debug.apk" }
+    rename { "EchoTimer-v$appVersionName-debug.apk" }
 }

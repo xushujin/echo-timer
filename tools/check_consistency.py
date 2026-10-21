@@ -162,12 +162,12 @@ def main() -> None:
 
     # ---- 产物命名 ----
     require(
-        'rename { "EchoTimer.apk" }' in app_gradle,
-        "构建脚本把 release 产物命名为 EchoTimer.apk",
+        'rename { "EchoTimer-v$appVersionName.apk" }' in app_gradle,
+        "构建脚本把 release 产物命名为 EchoTimer-v<version>.apk",
     )
-    require("build/dist/EchoTimer.apk" in readme, "README 使用 build/dist/EchoTimer.apk")
+    require("build/dist/EchoTimer-v" in readme, "README 使用带版本号的 release 产物名")
     require("distDebugApk" in app_gradle, "构建脚本提供 distDebugApk 任务")
-    require("build/dist/debug/EchoTimer-debug.apk" in readme, "README 标注了调试产物路径")
+    require("build/dist/debug/EchoTimer-v" in readme, "README 标注了带版本号的调试产物路径")
 
     print()
     if problems:

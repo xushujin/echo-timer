@@ -156,7 +156,7 @@
     <string name="about_stack_voice">语音</string>
     <string name="about_stack_voice_value">系统 TTS + SpeechRecognizer，无第三方语音库</string>
     <string name="about_section_support">支持范围</string>
-    <string name="about_support_os">系统：Android 8.0（API 26）至 Android 15（API 35）。</string>
+    <string name="about_support_os">系统：Android 8.0（API 26）至 Android 16（API 36）。</string>
     <string name="about_support_locale">语言：中文界面与中文播报；英文口令（start / stop 等）同样可识别。</string>
     <string name="about_support_tts">播报依赖系统 TTS 引擎，通常可离线使用；若系统未安装中文语音包，会自动回退到默认语言。</string>
     <string name="about_support_network">语音识别由系统识别服务提供，离线能力取决于该服务；若设备未安装此类服务，语音指令不可用，可继续用按钮操作。</string>

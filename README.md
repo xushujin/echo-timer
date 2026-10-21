@@ -49,7 +49,7 @@
 | 语言 | Kotlin 2.1.0（`allWarningsAsErrors = true`） |
 | 界面 | Jetpack Compose，Compose BOM 2024.12.01 + Material3（仅用主题、对话框、输入框等基础组件） |
 | 构建 | Gradle 8.11.1 + AGP 8.7.3，JVM 目标 17，构建使用 JDK 21 |
-| SDK | minSdk 26（Android 8.0），targetSdk / compileSdk 35（Android 15，API 35） |
+| SDK | minSdk 26（Android 8.0），targetSdk / compileSdk 36（Android 16，API 36） |
 | 数据 | 手写 `SQLiteOpenHelper` + 显式版本迁移（未使用 Room） |
 | 语音合成 | 系统 `TextToSpeech` |
 | 语音识别 | 系统 `SpeechRecognizer`（`RecognitionService`） |
@@ -124,7 +124,7 @@ tools/
 ### 环境要求
 
 - JDK 17–21（本次验证使用 JDK 21；Gradle 8.11 尚不支持 JDK 25，系统自带的 25 需显式切换）
-- Android SDK：`platforms;android-35`、`build-tools;35.0.0`、`platform-tools`
+- Android SDK：`platforms;android-36`、`build-tools;36.0.0`、`platform-tools`
 - 无需 Android Studio，命令行即可完成全部构建
 
 ### 配置 SDK 路径
@@ -142,14 +142,14 @@ cp local.properties.example local.properties
 ./gradlew :app:assembleDebug          # 调试包
 ./gradlew :app:testDebugUnitTest      # 单元测试
 ./gradlew :app:lintDebug              # 静态检查（warningsAsErrors）
-./gradlew :app:distReleaseApk         # 签名 release 包 → build/dist/EchoTimer.apk
-./gradlew :app:distDebugApk           # 调试包 → build/dist/debug/EchoTimer-debug.apk
+./gradlew :app:distReleaseApk         # 签名 release 包 → build/dist/EchoTimer-v1.0.0.apk
+./gradlew :app:distDebugApk           # 调试包 → build/dist/debug/EchoTimer-v1.0.0-debug.apk
 python3 tools/verify_migrations.py    # 用真实 sqlite3 跑迁移
 python3 tools/check_consistency.py    # 文档与代码一致性核对
 ```
 
-`distReleaseApk` 会把产物同步为 `build/dist/EchoTimer.apk`（CI 直接上传该文件）；
-`distDebugApk` 输出 `build/dist/debug/EchoTimer-debug.apk`。两个任务都用 Sync，
+产物文件名**带版本号**：`distReleaseApk` 输出 `build/dist/EchoTimer-v1.0.0.apk`（CI 直接上传），
+`distDebugApk` 输出 `build/dist/debug/EchoTimer-v1.0.0-debug.apk`。两个任务都用 Sync，
 且 release 任务带一个 `prepareDistDir` 前置任务（清旧包 + 校验签名配置），
 所以切换版本或漏配签名时，dist 里不会留下可被误发的旧包。
 
@@ -202,7 +202,7 @@ base64 -i release-keystore/echotimer-release.jks | tr -d '\n' > keystore.b64
 ### 校验签名
 
 ```bash
-$ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs build/dist/EchoTimer.apk
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs build/dist/EchoTimer-v1.0.0.apk
 ```
 
 ### GitHub 仓库需要配置什么
@@ -375,8 +375,8 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
 - Lint：`warningsAsErrors = true`、`abortOnError = true`，`lintDebug` / `lintRelease` 均输出 `No issues found.`
 - `app/lint.xml` 有两条显式忽略，都写明原因：
   - `ObsoleteSdkInt`（仅 `mipmap-anydpi-v26`）：AAPT 要求 `<adaptive-icon>` 放在带版本限定的目录，该提示属于误报。
-  - `OldTargetApi`：项目有意停在 `targetSdk = 35`（按 35 适配并验证）。CI 镜像常预装更新的 platform，
-    lint 会报"未使用最新 API"，这里忽略；升级 targetSdk 时删掉这条即可重新看到提示。
+  - `OldTargetApi`：CI 镜像会随平台更新预装更新的 Android platform，而 lint 在"未使用最新 API"时报错，
+    会让发版被环境升级卡住。这里忽略该检查（项目当前 targetSdk = 36），改版时按需手动检查目标 API。
 
 ### 单元测试（64 个，全部通过）
 
@@ -487,4 +487,5 @@ PASS  删除榜单时级联删除成绩
   支持手工录入成绩与单条删除；成绩只有严格更大才更新，列表按秒数降序，第一名小皇冠、最后一名小菜刀。
 - 拟态界面：3 套配色（石墨 / 暖沙 / 雾青）× 明暗两态，全局切换立即生效。
 - 数据：SQLite v3（显式迁移，v1 计时记录 → v2 备注列 → v3 天梯榜）。
-- 发布：推送 `v*` tag 触发 GitHub Actions，签名构建 APK 并创建 Release。
+- 发布：推送 `v*` tag 触发 GitHub Actions，签名构建 APK（文件名带版本号）并创建 Release。
+  目标 API 为 36（Android 16），最低支持 26（Android 8.0）。
