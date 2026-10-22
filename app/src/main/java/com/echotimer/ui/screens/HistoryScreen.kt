@@ -12,10 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echotimer.R
@@ -33,7 +31,11 @@ import com.echotimer.core.time.ElapsedFormatter
 import com.echotimer.data.LapRecord
 import com.echotimer.data.TimingSession
 import com.echotimer.ui.DateFormats
+import com.echotimer.ui.components.DialogBodyText
 import com.echotimer.ui.components.NeumorphicChip
+import com.echotimer.ui.components.NeumorphicDialog
+import com.echotimer.ui.components.NeumorphicDialogButton
+import com.echotimer.ui.components.NeumorphicTextField
 import com.echotimer.ui.components.SectionTitle
 import com.echotimer.ui.components.NeumorphicCard
 import com.echotimer.ui.theme.LocalEchoColors
@@ -113,58 +115,61 @@ fun HistoryScreen(
 
     val targetToDelete = deleteTarget
     if (targetToDelete != null) {
-        AlertDialog(
+        NeumorphicDialog(
+            title = stringResource(R.string.history_delete_title),
             onDismissRequest = { deleteTarget = null },
-            title = { Text(stringResource(R.string.history_delete_title)) },
-            text = { Text(stringResource(R.string.history_delete_body)) },
-            confirmButton = {
-                TextButton(
+            contentMaxHeight = 160.dp,
+            actions = {
+                Spacer(Modifier.weight(1f))
+                NeumorphicDialogButton(
+                    label = stringResource(R.string.action_cancel),
+                    onClick = { deleteTarget = null },
+                )
+                NeumorphicDialogButton(
+                    label = stringResource(R.string.action_confirm),
+                    emphasis = true,
+                    danger = true,
                     onClick = {
                         onDelete(targetToDelete.id)
                         deleteTarget = null
                     },
-                ) {
-                    Text(stringResource(R.string.action_confirm), color = colors.danger)
-                }
+                )
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
+        ) {
+            DialogBodyText(stringResource(R.string.history_delete_body))
+        }
     }
 
     val targetToRename = renameTarget
     if (targetToRename != null) {
         var draft by remember(targetToRename.id) { mutableStateOf(targetToRename.note) }
-        AlertDialog(
+        NeumorphicDialog(
+            title = stringResource(R.string.history_rename_title),
             onDismissRequest = { renameTarget = null },
-            title = { Text(stringResource(R.string.history_rename_title)) },
-            text = {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.history_rename_hint)) },
+            contentMaxHeight = 180.dp,
+            actions = {
+                Spacer(Modifier.weight(1f))
+                NeumorphicDialogButton(
+                    label = stringResource(R.string.action_cancel),
+                    onClick = { renameTarget = null },
                 )
-            },
-            confirmButton = {
-                TextButton(
+                NeumorphicDialogButton(
+                    label = stringResource(R.string.action_confirm),
+                    emphasis = true,
                     onClick = {
                         onRename(targetToRename.id, draft)
                         renameTarget = null
                     },
-                ) {
-                    Text(stringResource(R.string.action_confirm))
-                }
+                )
             },
-            dismissButton = {
-                TextButton(onClick = { renameTarget = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
+        ) {
+            NeumorphicTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                label = stringResource(R.string.history_rename_hint),
+                imeAction = ImeAction.Done,
+            )
+        }
     }
 }
 

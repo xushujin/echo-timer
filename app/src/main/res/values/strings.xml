@@ -96,6 +96,17 @@
     <string name="leaderboard_entry_delete">删除成绩</string>
     <string name="leaderboard_entry_delete_title">删除这条成绩？</string>
     <string name="leaderboard_entry_delete_body">%1$s · %2$s 会从榜单中移除，不可恢复。</string>
+    <string name="leaderboard_share">分享</string>
+    <string name="leaderboard_share_title">榜单图片</string>
+    <string name="leaderboard_share_preview">榜单图片预览</string>
+    <string name="leaderboard_share_action">分享图片</string>
+    <string name="leaderboard_share_save">保存到相册</string>
+    <string name="leaderboard_share_saved">已保存到相册 Pictures/EchoTimer</string>
+    <string name="leaderboard_share_save_failed">保存失败，请改用分享</string>
+    <string name="leaderboard_share_failed">没有可用的分享应用</string>
+    <string name="leaderboard_share_chooser">分享榜单图片</string>
+    <string name="leaderboard_share_footer">EchoTimer · 天梯榜</string>
+    <string name="leaderboard_share_note">仅展示前 %1$d 名（共 %2$d 人）</string>
     <string name="challenge_pause">暂停</string>
     <string name="challenge_resume">继续</string>
     <string name="challenge_finish">结束</string>

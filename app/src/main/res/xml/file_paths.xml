@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  分享榜单图片时把缓存目录里的 PNG 通过 content:// 交给其它应用。
+  只暴露 cache/shared，不暴露任何用户数据目录。
+-->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

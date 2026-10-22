@@ -5,7 +5,7 @@
 一个不依赖任何第三方 UI 库 / 依赖注入框架的秒表应用：计时过程中按你设定的时间点用语音报时，
 并且可以用「开始」「结束」这类口令直接控制计时。计时结果以多组记录的形式保存在本机。
 
-当前版本：1.0.0
+当前版本：1.0.1
 
 ---
 
@@ -37,6 +37,7 @@
 | 语音指令 | 说「开始」开始计时，说「结束」结束并保存；另支持暂停 / 继续 / 计次，中英文口令均可 |
 | 多组历史记录 | 每次结束自动入库（可关闭），带计次明细（最后一次在最前），支持重命名、删除 |
 | 天梯榜 | 自定义多个榜单（名称唯一），输入或选择姓名后开始不计次的挑战（**同样按设定间隔报时**）；支持**手工录入**成绩；只有超过原记录才更新，榜单按秒数降序 |
+| 榜单分享 | 把整个榜单导出成一张 PNG（第一名皇冠 / 最后一名菜刀、配色跟随当前主题），可分享到任意应用或存进相册 |
 | 拟态界面 | 3 套配色（石墨 / 暖沙 / 雾青）× 明暗两态，全局切换立即生效 |
 | 关于页 | 应用名、版本号、技术栈、支持范围、权限说明 |
 
@@ -47,13 +48,13 @@
 | 项目 | 版本 / 取值 |
 | --- | --- |
 | 语言 | Kotlin 2.1.0（`allWarningsAsErrors = true`） |
-| 界面 | Jetpack Compose，Compose BOM 2024.12.01 + Material3（仅用主题、对话框、输入框等基础组件） |
+| 界面 | Jetpack Compose，Compose BOM 2024.12.01 + Material3（只用主题与文本样式；对话框、输入框、开关均为自绘拟态组件） |
 | 构建 | Gradle 8.11.1 + AGP 8.7.3，JVM 目标 17，构建使用 JDK 21 |
 | SDK | minSdk 26（Android 8.0），targetSdk / compileSdk 36（Android 16，API 36） |
 | 数据 | 手写 `SQLiteOpenHelper` + 显式版本迁移（未使用 Room） |
 | 语音合成 | 系统 `TextToSpeech` |
 | 语音识别 | 系统 `SpeechRecognizer`（`RecognitionService`） |
-| 测试 | JUnit4（64 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
+| 测试 | JUnit4（74 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
 
 版本号在构建脚本里只有一处定义（`app/build.gradle.kts` 的 `appVersionName` / `appVersionCode`），
 关于页通过 `BuildConfig` 读取；`tools/check_consistency.py` 会核对构建脚本、README 与关于页三者是否一致。
@@ -75,6 +76,7 @@
 | 拟态视觉 | 自研 `Modifier.neumorphicFace` | 多层低 alpha 圆角矩形叠加模拟软阴影，API 26 起表现一致 |
 | 主题系统 | 自研 `Palettes` + `CompositionLocal` | 3 套配色 × 明暗，单一入口全局生效 |
 | 图标 | 自研 `GlyphIcon` | Canvas 手绘，不引图标库 |
+| 榜单分享图 | 自研 `LeaderboardPoster` | 用 `android.graphics` 按数据排版，不依赖截屏 API，长榜单也能整张导出 |
 | 数据层 | 自研 `EchoDb` + `Migrations` | 显式迁移，缺失迁移直接抛异常 |
 | 语音合成 | 系统 `TextToSpeech` | 平台能力；调度与文本生成是自研的 |
 | 语音识别 | 系统 `SpeechRecognizer` | 平台能力，仅作"声音 → 文本"输入；文本如何变成动作是自研的 |
@@ -91,6 +93,7 @@ app/src/main/java/com/echotimer/
 ├── MainActivity.kt
 ├── core/
 │   ├── leaderboard/             # 天梯榜模型与规则（纯函数）
+│   ├── share/                   # 分享图版面常量与文件名规则（纯函数）
 │   ├── settings/                # 设置模型、序列化、唯一读写入口
 │   ├── theme/                   # 配色规格（纯数据，可单测对比度）
 │   ├── time/                    # 秒表内核、播报调度、时间格式化
@@ -106,11 +109,12 @@ app/src/main/java/com/echotimer/
     ├── HistoryViewModel.kt
     ├── LeaderboardViewModel.kt  # 榜单/挑战编排
     ├── DateFormats.kt           # 历史记录日期格式化
-    ├── components/              # 拟态控件、手绘图标、麦克风权限、语音能力状态与提示弹窗
+    ├── components/              # 拟态控件、拟态弹窗/输入框、手绘图标、麦克风权限、语音能力状态
     ├── neumorph/                # 拟态绘制原语
+    ├── share/                   # 榜单分享图渲染（android.graphics）+ 分享/存相册
     ├── screens/                 # 计时 / 记录 / 天梯 / 挑战 / 设置 / 关于
     └── theme/                   # Compose 主题适配
-app/src/test/java/com/echotimer/ # 64 个 JVM 单测
+app/src/test/java/com/echotimer/ # 74 个 JVM 单测
 tools/
 ├── verify_migrations.py         # 用真实 sqlite3 验证迁移
 └── check_consistency.py         # 文档 / 构建脚本 / 代码一致性检查
@@ -326,6 +330,9 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
 - 榜单成绩按 `best_ms` **降序**排列；同分时更新时间早的在前。
 - 列表里第一名带小皇冠、最后一名带小菜刀（只有一个人时按第一名显示皇冠）。
 - 每条成绩可单独删除（右侧垃圾桶图标 + 二次确认），删除后榜单人数与最佳成绩同步刷新。
+- 点右上角「分享」可把整个榜单导出成图片：**按数据重新排版**（不是截屏，长榜单也能一张图装下），
+  配色跟随当前主题，第一名皇冠、最后一名菜刀都会画上；超过 40 人时只画前 40 名并注明总人数。
+  图片可分享到任意应用，Android 10 及以上还可直接存进相册 `Pictures/EchoTimer`。
 - 删除榜单会级联删除其全部成绩。
 
 ## 语音指令规则
@@ -378,7 +385,7 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
   - `OldTargetApi`：CI 镜像会随平台更新预装更新的 Android platform，而 lint 在"未使用最新 API"时报错，
     会让发版被环境升级卡住。这里忽略该检查（项目当前 targetSdk = 36），改版时按需手动检查目标 API。
 
-### 单元测试（64 个，全部通过）
+### 单元测试（74 个，全部通过）
 
 | 测试类 | 用例数 | 覆盖点 |
 | --- | --- | --- |
@@ -392,6 +399,8 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
 | `MigrationsTest` | 7 | 版本连续、无破坏性语句、v1 建表完整、v2 加列带默认值、v3 天梯表 |
 | `LeaderboardRulesTest` | 5 | 名称归一化/空值/超长、首次上榜、只有严格更大才更新 |
 | `TimeInputParserTest` | 5 | 纯秒数 / 分:秒 / 时:分:秒、全角输入、非法与超范围输入 |
+| `ShareNamingTest` | 5 | 文件名清洗、空名回落、长度截断、时间戳格式 |
+| `PosterLayoutTest` | 5 | 版面高度计算、行数上限、位图大小不超安全值 |
 
 ### 真实引擎验证（迁移）
 
@@ -422,7 +431,7 @@ PASS  删除榜单时级联删除成绩
 ### APK 产物验证
 
 - `apksigner verify`：`Verifies`，APK Signature Scheme v2 通过，签名者 1 个。
-- `aapt2 dump badging`：`package: com.echotimer versionCode='2' versionName='1.0.1'`，`targetSdkVersion:'35'`，
+- `aapt2 dump badging`：`package: com.echotimer versionCode='2' versionName='1.0.1'`，`targetSdkVersion:'36'`，
   权限只有 `RECORD_AUDIO` 与 `INTERNET`（另有 AndroidX 自动合并的私有权限），启动 Activity 为 `com.echotimer.MainActivity`。
 - 签名两条通道都已实测：`keystore.properties` 与 `ECHO_*` 环境变量分别产出的 APK 证书不同，
   证明取值来源确实切换了；CI 环境下缺签名材料时构建按预期失败。
@@ -448,7 +457,7 @@ PASS  删除榜单时级联删除成绩
 **已验证**
 
 - 编译（debug / release）、Kotlin 零警告、lint 零问题
-- 64 个单元测试全部通过
+- 74 个单元测试全部通过
 - 真实 `sqlite3` 上的迁移与数据保留、级联删除
 - release APK 构建、签名、清单与权限核对（两条签名通道 + CI 缺签名保护）
 
@@ -459,7 +468,10 @@ PASS  删除榜单时级联删除成绩
 3. **语音识别命中率**：`SpeechRecognizer` 在不同厂商 ROM 上的识别质量、连续监听的耗电与稳定性未实测。
 4. **R8 混淆后的运行时行为**：release 已开启 `minifyEnabled` + `shrinkResources`，构建通过、APK 结构正常，
    但混淆后的运行路径未在设备上验证。
-5. **GitHub Actions 工作流**：本机没有远端仓库，未实际触发；已用与工作流相同的命令序列在本地复现通过。
+5. **分享图的实际渲染**：`LeaderboardPoster` 只做了版面尺寸与文件名的单元测试；
+   中文字形、长姓名省略号、深色主题下的观感需要真机看，未在设备上验证。
+6. **相册保存**：走 MediaStore（Android 10+），未在真机上确认相册里能看到。
+7. **GitHub Actions 工作流**：已实际跑通（v1.0.0 发布成功），本文件记录的是当时那版的流水线。
 
 **产品层面的限制**
 
@@ -469,13 +481,23 @@ PASS  删除榜单时级联删除成绩
   离线能力也取决于该服务；这两种情况都可以继续用按钮操作。
 - 播报间隔为单选；"1s 和 10s 都播"这种组合当前不支持（已改为单选语义，避免歧义）。
 - 不支持数据导出/同步，卸载即清除。
-- 天梯挑战不计次、不播报、不响应语音指令（独立于计时页的秒表）；榜单名与姓名上限 20 个字符。
+- 天梯挑战不计次、不响应语音指令（独立于计时页的秒表），但**会按设定间隔报时**；榜单名与姓名上限 20 个字符。
+- 分享图最多画 40 行（更大的榜单会截断并注明总人数），单张 PNG 约 1–24 MB。
 - 天梯成绩"越大越好"：只有新成绩严格大于原记录才会更新。
 - 横屏/分屏时计时页切换为可滚动布局（表盘缩至 200dp），未针对大屏做专门排版。
 
 ---
 
 ## 变更记录
+
+### v1.0.1
+
+- **弹窗改成拟态风格**：新增 `NeumorphicDialog` / `NeumorphicDialogButton` / `NeumorphicTextField`，
+  替换全部 Material3 默认对话框（新建榜单、开始挑战、手工录入、删除榜单/成绩、重命名记录、放弃挑战、语音不可用）。
+  原来是白底直角面板 + 描边输入框，跟整体风格割裂；现在是与页面同款的圆角拟态面板、凹陷输入槽、胶囊按钮。
+- **榜单可导出图片分享**：详情页右上角「分享」→ 按数据重新排版成 PNG（不是截屏），
+  可分享到任意应用；Android 10+ 支持存进相册 `Pictures/EchoTimer`。
+- 版本号 1.0.1（versionCode 2）。
 
 ### v1.0.0（首次发布）
 

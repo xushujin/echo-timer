@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +30,9 @@ import com.echotimer.ui.ChallengeState
 import com.echotimer.ui.components.Glyph
 import com.echotimer.ui.components.NeumorphicCard
 import com.echotimer.ui.components.NeumorphicChip
+import com.echotimer.ui.components.DialogBodyText
+import com.echotimer.ui.components.NeumorphicDialog
+import com.echotimer.ui.components.NeumorphicDialogButton
 import com.echotimer.ui.components.NeumorphicIconButton
 import com.echotimer.ui.components.submitResultText
 import com.echotimer.ui.neumorph.NeumorphicSurface
@@ -133,26 +134,29 @@ fun ChallengeScreen(
     }
 
     if (showDiscardDialog) {
-        AlertDialog(
+        NeumorphicDialog(
+            title = stringResource(R.string.challenge_discard_title),
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text(stringResource(R.string.challenge_discard_title)) },
-            text = { Text(stringResource(R.string.challenge_discard_body)) },
-            confirmButton = {
-                TextButton(
+            contentMaxHeight = 160.dp,
+            actions = {
+                Spacer(Modifier.weight(1f))
+                NeumorphicDialogButton(
+                    label = stringResource(R.string.action_cancel),
+                    onClick = { showDiscardDialog = false },
+                )
+                NeumorphicDialogButton(
+                    label = stringResource(R.string.challenge_discard_confirm),
+                    emphasis = true,
+                    danger = true,
                     onClick = {
                         showDiscardDialog = false
                         onExit()
                     },
-                ) {
-                    Text(stringResource(R.string.challenge_discard_confirm), color = colors.danger)
-                }
+                )
             },
-            dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
+        ) {
+            DialogBodyText(stringResource(R.string.challenge_discard_body))
+        }
     }
 }
 

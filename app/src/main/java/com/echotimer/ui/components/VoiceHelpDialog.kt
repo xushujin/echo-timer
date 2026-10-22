@@ -4,11 +4,11 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.echotimer.R
 import com.echotimer.core.voice.SpeechAvailability
 
@@ -38,26 +38,28 @@ fun SpeechUnavailableDialog(
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    AlertDialog(
+    NeumorphicDialog(
+        title = stringResource(R.string.voice_unavailable_title),
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.voice_unavailable_title)) },
-        text = {
-            Text(
-                stringResource(
-                    R.string.voice_unavailable_body,
-                    availability.servicePackages.size,
-                ),
+        contentMaxHeight = 320.dp,
+        actions = {
+            Spacer(Modifier.weight(1f))
+            NeumorphicDialogButton(
+                label = stringResource(R.string.voice_unavailable_close),
+                onClick = onDismiss,
+            )
+            NeumorphicDialogButton(
+                label = stringResource(R.string.voice_unavailable_open_settings),
+                onClick = onOpenSettings,
+                emphasis = true,
             )
         },
-        confirmButton = {
-            TextButton(onClick = onOpenSettings) {
-                Text(stringResource(R.string.voice_unavailable_open_settings))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.voice_unavailable_close))
-            }
-        },
-    )
+    ) {
+        DialogBodyText(
+            stringResource(
+                R.string.voice_unavailable_body,
+                availability.servicePackages.size,
+            ),
+        )
+    }
 }
