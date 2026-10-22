@@ -1,7 +1,7 @@
 package com.echotimer.core.share
 
 /** 榜单图片里姓名后面跟的名次标记。 */
-enum class PosterMark { CROWN, CLEAVER, NONE }
+enum class PosterMark { CROWN, NONE }
 
 /** 榜单图片里的一行成绩。 */
 data class PosterRow(
@@ -21,6 +21,8 @@ data class PosterPalette(
     val textSecondary: Int,
     val accent: Int,
     val onAccent: Int,
+    /** 最后一名整行标红用的颜色。 */
+    val danger: Int,
     val shadowLight: Int,
     val shadowDark: Int,
 )

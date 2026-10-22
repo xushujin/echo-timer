@@ -16,6 +16,7 @@ fun EchoColors.toPosterPalette(): PosterPalette = PosterPalette(
     textSecondary = textSecondary.toArgb(),
     accent = accent.toArgb(),
     onAccent = onAccent.toArgb(),
+    danger = danger.toArgb(),
     shadowLight = shadowLight.toArgb(),
     shadowDark = shadowDark.toArgb(),
 )

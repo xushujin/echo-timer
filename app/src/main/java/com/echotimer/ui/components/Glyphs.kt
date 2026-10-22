@@ -28,7 +28,6 @@ enum class Glyph {
     INFO,
     TROPHY,
     CROWN,
-    CLEAVER,
     MIC,
     TRASH,
     EDIT,
@@ -56,7 +55,6 @@ fun GlyphIcon(
             Glyph.INFO -> drawInfo(tint, stroke)
             Glyph.TROPHY -> drawTrophy(tint, stroke)
             Glyph.CROWN -> drawCrown(tint)
-            Glyph.CLEAVER -> drawCleaver(tint, stroke)
             Glyph.MIC -> drawMic(tint, stroke)
             Glyph.TRASH -> drawTrash(tint, stroke)
             Glyph.EDIT -> drawPencil(tint, stroke)
@@ -224,25 +222,6 @@ private fun DrawScope.drawCrown(color: Color) {
         topLeft = Offset(size.width * 0.18f, size.height * 0.76f),
         size = Size(size.width * 0.64f, size.height * 0.10f),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width * 0.05f),
-    )
-}
-
-/** 菜刀：最后一名标记。 */
-private fun DrawScope.drawCleaver(color: Color, stroke: Stroke) {
-    val blade = Path().apply {
-        moveTo(size.width * 0.14f, size.height * 0.34f)
-        lineTo(size.width * 0.60f, size.height * 0.28f)
-        lineTo(size.width * 0.60f, size.height * 0.62f)
-        lineTo(size.width * 0.14f, size.height * 0.56f)
-        close()
-    }
-    drawPath(blade, color)
-    drawLine(
-        color = color,
-        start = Offset(size.width * 0.60f, size.height * 0.45f),
-        end = Offset(size.width * 0.86f, size.height * 0.45f),
-        strokeWidth = stroke.width * 1.4f,
-        cap = StrokeCap.Round,
     )
 }
 

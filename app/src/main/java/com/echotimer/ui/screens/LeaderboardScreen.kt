@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -298,11 +299,7 @@ private fun BoardDetailScreen(
                                 name = entry.player,
                                 time = ElapsedFormatter.clock(entry.bestMs),
                                 date = DateFormats.dateTime(entry.updatedAt),
-                                mark = when {
-                                    index == 0 -> PosterMark.CROWN
-                                    index == entries.lastIndex -> PosterMark.CLEAVER
-                                    else -> PosterMark.NONE
-                                },
+                                mark = if (index == 0) PosterMark.CROWN else PosterMark.NONE,
                             )
                         },
                         footer = posterFooter,
@@ -544,30 +541,32 @@ private fun EntryRow(
     onDelete: () -> Unit,
 ) {
     val colors = LocalEchoColors.current
-    NeumorphicCard(
+    // 最后一名整行标红；只有一个人上榜时按第一名处理，不标红。
+    val lastPlace = isLast && rank > 1
+    val faceColor = if (lastPlace) lerp(colors.surface, colors.danger, 0.16f) else colors.surface
+    val nameColor = if (lastPlace) colors.danger else colors.textPrimary
+    NeumorphicSurface(
         modifier = Modifier.fillMaxWidth(),
         cornerRadius = 18.dp,
         depth = 10.dp,
+        faceColor = faceColor,
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RankBadge(rank = rank)
+            RankBadge(rank = rank, lastPlace = lastPlace)
             Spacer(Modifier.size(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = entry.player,
-                        color = colors.textPrimary,
+                        color = nameColor,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                     )
-                    // 第一名小皇冠；最后一名小菜刀（只有一个人时按第一名处理）。
+                    // 第一名带小皇冠。
                     if (rank == 1) {
                         Spacer(Modifier.size(5.dp))
                         GlyphIcon(glyph = Glyph.CROWN, size = 14.dp, tint = colors.accent)
-                    } else if (isLast) {
-                        Spacer(Modifier.size(5.dp))
-                        GlyphIcon(glyph = Glyph.CLEAVER, size = 14.dp, tint = colors.textSecondary)
                     }
                 }
                 Text(
@@ -578,7 +577,7 @@ private fun EntryRow(
             }
             Text(
                 text = ElapsedFormatter.clock(entry.bestMs),
-                color = colors.textPrimary,
+                color = nameColor,
                 fontSize = 16.sp,
                 fontFamily = FontFamily.Monospace,
             )
@@ -598,18 +597,28 @@ private fun EntryRow(
 }
 
 @Composable
-private fun RankBadge(rank: Int) {
+private fun RankBadge(rank: Int, lastPlace: Boolean = false) {
     val colors = LocalEchoColors.current
+    val faceColor = when {
+        lastPlace -> lerp(colors.surface, colors.danger, 0.30f)
+        rank <= 3 -> colors.accent
+        else -> colors.surface
+    }
+    val textColor = when {
+        lastPlace -> colors.danger
+        rank <= 3 -> colors.onAccent
+        else -> colors.textSecondary
+    }
     Box(modifier = Modifier.size(30.dp), contentAlignment = Alignment.Center) {
         NeumorphicSurface(
             modifier = Modifier.fillMaxSize(),
             circle = true,
             depth = 6.dp,
-            faceColor = if (rank <= 3) colors.accent else colors.surface,
+            faceColor = faceColor,
         ) {}
         Text(
             text = stringResource(R.string.leaderboard_rank, rank),
-            color = if (rank <= 3) colors.onAccent else colors.textSecondary,
+            color = textColor,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )

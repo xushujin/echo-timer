@@ -106,8 +106,10 @@ object LeaderboardPoster {
         drawSoftShadow(canvas, card, radius, withAlpha(palette.shadowDark, 0.55f), 6f, 6f, 14f)
         drawSoftShadow(canvas, card, radius, withAlpha(palette.shadowLight, 0.85f), -6f, -6f, 12f)
 
+        // 最后一名整行标红（只有一人上榜时按第一名处理，不标红）。
+        val lastPlace = isLast && row.rank > 1
         val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = palette.surface
+            color = if (lastPlace) blend(palette.surface, palette.danger, 0.16f) else palette.surface
         }
         canvas.drawRoundRect(card, radius, radius, face)
 
@@ -116,12 +118,20 @@ object LeaderboardPoster {
         val badgeCx = pad + 44f
         val topThree = row.rank <= 3
         val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (topThree) palette.accent else palette.surfaceAlt
+            color = when {
+                lastPlace -> blend(palette.surface, palette.danger, 0.30f)
+                topThree -> palette.accent
+                else -> palette.surfaceAlt
+            }
         }
         canvas.drawCircle(badgeCx, centerY, badgeRadius, badgePaint)
 
         val rankPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (topThree) palette.onAccent else palette.textSecondary
+            color = when {
+                lastPlace -> palette.danger
+                topThree -> palette.onAccent
+                else -> palette.textSecondary
+            }
             textSize = 30f
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -130,7 +140,7 @@ object LeaderboardPoster {
 
         val nameLeft = badgeCx + badgeRadius + 26f
         val timePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = palette.textPrimary
+            color = if (lastPlace) palette.danger else palette.textPrimary
             textSize = 40f
             textAlign = Paint.Align.RIGHT
             typeface = Typeface.MONOSPACE
@@ -140,7 +150,7 @@ object LeaderboardPoster {
 
         val timeLeft = timeRight - timePaint.measureText(row.time) - 30f
         val namePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = palette.textPrimary
+            color = if (lastPlace) palette.danger else palette.textPrimary
             textSize = 36f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
@@ -158,14 +168,6 @@ object LeaderboardPoster {
                 palette.accent,
             )
 
-            PosterMark.CLEAVER -> drawCleaver(
-                canvas,
-                nameLeft + namePaint.measureText(name) + 12f,
-                centerY - 30f,
-                34f,
-                palette.textSecondary,
-            )
-
             PosterMark.NONE -> Unit
         }
 
@@ -174,15 +176,6 @@ object LeaderboardPoster {
             textSize = 24f
         }
         canvas.drawText(row.date, nameLeft, centerY + 40f, datePaint)
-
-        // 最后一名额外画一条弱化的底边，呼应界面里的"菜刀"语义（只有一人时不画）。
-        if (isLast && row.rank > 1) {
-            val underline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(palette.shadowDark, 0.30f)
-                strokeWidth = 2f
-            }
-            canvas.drawLine(nameLeft, card.bottom - 18f, timeRight, card.bottom - 18f, underline)
-        }
     }
 
     private fun drawFooter(
@@ -267,32 +260,19 @@ object LeaderboardPoster {
         )
     }
 
-    private fun drawCleaver(canvas: Canvas, left: Float, top: Float, size: Float, color: Int) {
-        val blade = Path().apply {
-            moveTo(left + size * 0.14f, top + size * 0.34f)
-            lineTo(left + size * 0.60f, top + size * 0.28f)
-            lineTo(left + size * 0.60f, top + size * 0.62f)
-            lineTo(left + size * 0.14f, top + size * 0.56f)
-            close()
-        }
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
-        canvas.drawPath(blade, paint)
-        val handle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            strokeWidth = size * 0.14f
-            strokeCap = Paint.Cap.ROUND
-        }
-        canvas.drawLine(
-            left + size * 0.60f,
-            top + size * 0.45f,
-            left + size * 0.86f,
-            top + size * 0.45f,
-            handle,
-        )
-    }
-
     private fun ellipsize(text: String, paint: TextPaint, maxWidth: Float): String =
         TextUtils.ellipsize(text, paint, maxWidth, TextUtils.TruncateAt.END).toString()
+
+    /** 按比例把 [over] 混进 [base]，用于"同色系里带一点红"的行底色。 */
+    private fun blend(base: Int, over: Int, ratio: Float): Int {
+        val t = ratio.coerceIn(0f, 1f)
+        return Color.argb(
+            Color.alpha(base),
+            (Color.red(base) + (Color.red(over) - Color.red(base)) * t).toInt(),
+            (Color.green(base) + (Color.green(over) - Color.green(base)) * t).toInt(),
+            (Color.blue(base) + (Color.blue(over) - Color.blue(base)) * t).toInt(),
+        )
+    }
 
     private fun withAlpha(color: Int, alpha: Float): Int {
         val clamped = (alpha.coerceIn(0f, 1f) * 255f).toInt()
