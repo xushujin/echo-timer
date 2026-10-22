@@ -2,6 +2,29 @@ package com.echotimer.core.settings
 
 import com.echotimer.core.theme.Palettes
 
+/** 语音指令用哪个识别引擎。 */
+enum class VoiceEngine {
+    /** 系统识别可用就用系统，否则用离线口令识别。 */
+    AUTO,
+
+    /** 只用系统语音识别服务（需要设备装了 RecognitionService）。 */
+    SYSTEM,
+
+    /** 只用自研离线口令识别。 */
+    OFFLINE,
+}
+
+/**
+ * 离线口令识别的灵敏度。
+ *
+ * 数值是"命中门限 = 类间距离 × 该比例"里的比例：越高越容易命中，也越容易误触发。
+ */
+enum class OfflineSensitivity(val ratio: Float) {
+    LOW(0.42f),
+    MEDIUM(0.52f),
+    HIGH(0.62f),
+}
+
 /** 主题明暗模式。SYSTEM 表示跟随系统。 */
 enum class ThemeMode {
     SYSTEM,
@@ -34,6 +57,10 @@ data class AppSettings(
     val keepScreenOn: Boolean = true,
     /** 语音识别语言标签（BCP-47）。 */
     val recognitionLanguage: String = "zh-CN",
+    /** 语音指令引擎。 */
+    val voiceEngine: VoiceEngine = VoiceEngine.AUTO,
+    /** 离线口令识别灵敏度。 */
+    val offlineSensitivity: OfflineSensitivity = OfflineSensitivity.MEDIUM,
 ) {
 
     /** 归一化：非法值回落默认，保证从磁盘读到的脏数据不会把界面带崩。 */

@@ -48,13 +48,14 @@ import com.echotimer.core.time.IntervalMath
 import com.echotimer.core.time.LapSplit
 import com.echotimer.core.time.StopwatchState
 import com.echotimer.core.voice.VoiceStatus
+import com.echotimer.core.voice.offline.VoiceBackend
 import com.echotimer.ui.TimerUiState
 import com.echotimer.ui.components.Glyph
 import com.echotimer.ui.components.GlyphIcon
 import com.echotimer.ui.components.NeumorphicCard
 import com.echotimer.ui.components.NeumorphicIconButton
-import com.echotimer.ui.components.SpeechUnavailableDialog
 import com.echotimer.ui.components.StatusDot
+import com.echotimer.ui.components.VoiceSetupDialog
 import com.echotimer.ui.components.openVoiceInputSettings
 import com.echotimer.ui.components.rememberMicPermission
 import com.echotimer.ui.components.rememberSpeechAvailability
@@ -77,13 +78,16 @@ fun TimerScreen(
     onReset: () -> Unit,
     onVoiceToggle: (Boolean) -> Unit,
     onMicPermissionResult: (Boolean) -> Unit,
+    onOpenVoiceTraining: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val speech = rememberSpeechAvailability()
+    // 系统识别可用、或者已经录过离线口令，都算"能用语音"。
+    val canUseVoice = state.voiceBackend != VoiceBackend.NONE
     val mic = rememberMicPermission { granted ->
         onMicPermissionResult(granted)
-        if (granted && !settings.voiceCommandsEnabled && speech.value.usable) {
+        if (granted && !settings.voiceCommandsEnabled && canUseVoice) {
             onVoiceToggle(true)
         }
     }
@@ -92,11 +96,11 @@ fun TimerScreen(
     var showSpeechHelp by remember { mutableStateOf(false) }
 
     val onVoiceBarClick: () -> Unit = {
-        val latest = speech.refresh()
+        speech.refresh()
         when {
             settings.voiceCommandsEnabled -> onVoiceToggle(false)
-            // 设备没有识别服务时，说清楚原因并给出去处，而不是静默失败。
-            !latest.usable -> showSpeechHelp = true
+            // 两个引擎都不可用时，弹窗里给出"录离线口令"的入口，而不是只说一句不支持。
+            !canUseVoice -> showSpeechHelp = true
             mic.granted -> onVoiceToggle(true)
             else -> mic.request()
         }
@@ -129,6 +133,7 @@ fun TimerScreen(
                     settings = settings,
                     status = state.voiceStatus,
                     rmsLevel = state.rmsLevel,
+                    backend = state.voiceBackend,
                     onClick = onVoiceBarClick,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -166,6 +171,7 @@ fun TimerScreen(
                     settings = settings,
                     status = state.voiceStatus,
                     rmsLevel = state.rmsLevel,
+                    backend = state.voiceBackend,
                     onClick = onVoiceBarClick,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -176,12 +182,22 @@ fun TimerScreen(
     }
 
     if (showSpeechHelp) {
-        SpeechUnavailableDialog(
+        VoiceSetupDialog(
             availability = speech.value,
+            offlineTemplates = state.offlineTemplates,
             onDismiss = { showSpeechHelp = false },
+            onOpenTraining = {
+                showSpeechHelp = false
+                onOpenVoiceTraining()
+            },
             onOpenSettings = {
                 showSpeechHelp = false
-                openVoiceInputSettings(context)
+                // 没有任何识别服务时，ACTION_VOICE_INPUT_SETTINGS 在国内 ROM 上会落到
+                // 「默认数字助理应用」页面（与语音识别无关），所以直接开系统设置。
+                openVoiceInputSettings(
+                    context = context,
+                    preferVoiceInput = speech.value.servicePackages.isNotEmpty(),
+                )
             },
         )
     }
@@ -398,6 +414,7 @@ private fun VoiceBar(
     settings: AppSettings,
     status: VoiceStatus,
     rmsLevel: Float,
+    backend: VoiceBackend,
     onClick: () -> Unit,
 ) {
     val colors = LocalEchoColors.current
@@ -409,6 +426,9 @@ private fun VoiceBar(
         status == VoiceStatus.UNAVAILABLE -> stringResource(R.string.voice_unavailable)
         status == VoiceStatus.ERROR -> stringResource(R.string.voice_error)
         status == VoiceStatus.SUSPENDED -> stringResource(R.string.voice_suspended)
+        // 开关是开的但没在监听（例如训练弹窗占用麦克风期间），不能说"正在听"。
+        status == VoiceStatus.OFF -> stringResource(R.string.voice_paused)
+        backend == VoiceBackend.OFFLINE -> stringResource(R.string.voice_listening_offline)
         else -> stringResource(R.string.voice_listening)
     }
     val dotColor = when {

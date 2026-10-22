@@ -5,9 +5,9 @@ import android.os.SystemClock
 import com.echotimer.core.settings.SettingsRepository
 import com.echotimer.core.time.MonotonicClock
 import com.echotimer.core.voice.Announcer
-import com.echotimer.core.voice.SpeechCommandController
 import com.echotimer.core.voice.TtsAnnouncer
-import com.echotimer.core.voice.VoiceCommand
+import com.echotimer.core.voice.VoiceSourceFactory
+import com.echotimer.core.voice.offline.OfflineVoiceStore
 import com.echotimer.data.HistoryRepository
 import com.echotimer.data.LeaderboardRepository
 import com.echotimer.data.db.EchoDb
@@ -40,8 +40,11 @@ class AppContainer(context: Context) {
      */
     val announcer: Announcer by lazy { TtsAnnouncer(appContext) }
 
-    fun createSpeechController(
-        languageTag: String,
-        onCommand: (VoiceCommand) -> Unit,
-    ): SpeechCommandController = SpeechCommandController(appContext, languageTag, onCommand)
+    /** 离线口令模板（只存特征，不存音频）。 */
+    val voiceTemplates: OfflineVoiceStore by lazy { OfflineVoiceStore(appContext) }
+
+    /** 语音指令来源工厂：按设置与设备能力在"系统识别 / 离线口令"之间选择。 */
+    val voiceSourceFactory: VoiceSourceFactory by lazy {
+        VoiceSourceFactory(appContext, voiceTemplates, settingsRepository)
+    }
 }

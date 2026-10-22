@@ -37,10 +37,12 @@ import com.echotimer.R
 import com.echotimer.core.settings.AppSettings
 import com.echotimer.core.settings.ThemeMode
 import com.echotimer.core.theme.PaletteSpec
+import com.echotimer.core.settings.VoiceEngine
 import com.echotimer.core.theme.Palettes
+import com.echotimer.core.voice.VoiceCommand
 import com.echotimer.ui.components.NeumorphicChip
-import com.echotimer.ui.components.SpeechUnavailableDialog
 import com.echotimer.ui.components.NeumorphicSegmented
+import com.echotimer.ui.components.VoiceSetupDialog
 import com.echotimer.ui.components.NeumorphicToggle
 import com.echotimer.ui.components.SectionTitle
 import com.echotimer.ui.components.SettingRow
@@ -61,6 +63,8 @@ fun SettingsScreen(
     onUpdate: (AppSettings) -> Unit,
     onTestSpeak: () -> Unit,
     onMicPermissionResult: (Boolean) -> Unit,
+    offlineTemplates: Int,
+    onOpenVoiceTraining: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalEchoColors.current
@@ -69,8 +73,9 @@ fun SettingsScreen(
     var showSpeechHelp by remember { mutableStateOf(false) }
     val mic = rememberMicPermission { granted ->
         onMicPermissionResult(granted)
-        // 授权成功且设备有识别服务时，直接把语音指令打开，省掉再点一次开关。
-        if (granted && !settings.voiceCommandsEnabled && speech.value.usable) {
+        // 授权成功且确实有可用的引擎（系统识别或已录离线口令）时，直接打开语音指令。
+        val ready = speech.value.usable || offlineTemplates > 0
+        if (granted && !settings.voiceCommandsEnabled && ready) {
             onUpdate(settings.copy(voiceCommandsEnabled = true))
         }
     }
@@ -231,10 +236,12 @@ fun SettingsScreen(
                     NeumorphicToggle(
                         checked = settings.voiceCommandsEnabled,
                         onCheckedChange = { enabled ->
+                            // refresh() 的返回值才是最新结果：speech.value 是上次组合时的快照。
                             val latest = speech.refresh()
+                            val ready = latest.usable || offlineTemplates > 0
                             when {
                                 !enabled -> onUpdate(settings.copy(voiceCommandsEnabled = false))
-                                !latest.usable -> showSpeechHelp = true
+                                !ready -> showSpeechHelp = true
                                 !mic.granted -> mic.request()
                                 else -> onUpdate(settings.copy(voiceCommandsEnabled = true))
                             }
@@ -242,7 +249,7 @@ fun SettingsScreen(
                     )
                 },
             )
-            if (!speech.value.usable) {
+            if (!speech.value.usable && offlineTemplates == 0) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.settings_voice_unavailable_hint),
@@ -251,6 +258,60 @@ fun SettingsScreen(
                     lineHeight = 17.sp,
                 )
             }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.settings_voice_engine),
+                color = colors.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(10.dp))
+            NeumorphicSegmented(
+                options = listOf(
+                    stringResource(R.string.voice_engine_auto),
+                    stringResource(R.string.voice_engine_system),
+                    stringResource(R.string.voice_engine_offline),
+                ),
+                selectedIndex = when (settings.voiceEngine) {
+                    VoiceEngine.AUTO -> 0
+                    VoiceEngine.SYSTEM -> 1
+                    VoiceEngine.OFFLINE -> 2
+                },
+                onSelect = { index ->
+                    onUpdate(
+                        settings.copy(
+                            voiceEngine = when (index) {
+                                0 -> VoiceEngine.AUTO
+                                1 -> VoiceEngine.SYSTEM
+                                else -> VoiceEngine.OFFLINE
+                            },
+                        ),
+                    )
+                },
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_voice_engine_hint),
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+            )
+            Spacer(Modifier.height(16.dp))
+            SettingRow(
+                title = stringResource(R.string.settings_offline_templates),
+                subtitle = stringResource(
+                    R.string.settings_offline_templates_status,
+                    offlineTemplates,
+                    VoiceCommand.entries.size,
+                ) + " · " + stringResource(R.string.settings_offline_templates_hint),
+                control = {
+                    NeumorphicChip(
+                        label = stringResource(R.string.voice_setup_train),
+                        selected = false,
+                        onClick = onOpenVoiceTraining,
+                    )
+                },
+            )
             Spacer(Modifier.height(16.dp))
             SettingRow(
                 title = stringResource(R.string.settings_voice_permission),
@@ -325,12 +386,22 @@ fun SettingsScreen(
     }
 
     if (showSpeechHelp) {
-        SpeechUnavailableDialog(
+        VoiceSetupDialog(
             availability = speech.value,
+            offlineTemplates = offlineTemplates,
             onDismiss = { showSpeechHelp = false },
+            onOpenTraining = {
+                showSpeechHelp = false
+                onOpenVoiceTraining()
+            },
             onOpenSettings = {
                 showSpeechHelp = false
-                openVoiceInputSettings(context)
+                // 没有任何识别服务时，ACTION_VOICE_INPUT_SETTINGS 在国内 ROM 上会落到
+                // 「默认数字助理应用」页面（与语音识别无关），所以直接开系统设置。
+                openVoiceInputSettings(
+                    context = context,
+                    preferVoiceInput = speech.value.servicePackages.isNotEmpty(),
+                )
             },
         )
     }

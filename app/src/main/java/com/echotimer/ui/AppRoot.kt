@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,6 +41,7 @@ import com.echotimer.core.settings.AppSettings
 import com.echotimer.core.theme.Palettes
 import com.echotimer.ui.components.Glyph
 import com.echotimer.ui.components.GlyphIcon
+import com.echotimer.ui.components.VoiceTrainingDialog
 import com.echotimer.ui.neumorph.NeumorphicSurface
 import com.echotimer.ui.screens.AboutScreen
 import com.echotimer.ui.screens.HistoryScreen
@@ -101,6 +103,8 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
         }
     }
 
+    var showVoiceTraining by remember { mutableStateOf(false) }
+
     BackHandler(enabled = currentTab != AppTab.TIMER) { tabName = AppTab.TIMER.name }
 
     Column(
@@ -120,6 +124,10 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
                     onReset = timerViewModel::onReset,
                     onVoiceToggle = timerViewModel::setVoiceCommandsEnabled,
                     onMicPermissionResult = timerViewModel::onMicPermissionResult,
+                    onOpenVoiceTraining = {
+                        timerViewModel.setVoiceTrainingActive(true)
+                        showVoiceTraining = true
+                    },
                 )
 
                 AppTab.HISTORY -> HistoryScreen(
@@ -151,12 +159,31 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
                     onUpdate = { next -> container.settingsRepository.update { next } },
                     onTestSpeak = timerViewModel::testSpeak,
                     onMicPermissionResult = timerViewModel::onMicPermissionResult,
+                    offlineTemplates = timerState.offlineTemplates,
+                    onOpenVoiceTraining = {
+                        timerViewModel.setVoiceTrainingActive(true)
+                        showVoiceTraining = true
+                    },
                 )
 
                 AppTab.ABOUT -> AboutScreen()
             }
         }
         BottomBar(current = currentTab, onSelect = { tabName = it.name })
+    }
+
+    if (showVoiceTraining) {
+        VoiceTrainingDialog(
+            store = container.voiceTemplates,
+            sensitivity = settings.offlineSensitivity,
+            onSensitivityChange = { value ->
+                container.settingsRepository.update { it.copy(offlineSensitivity = value) }
+            },
+            onDismiss = {
+                showVoiceTraining = false
+                timerViewModel.setVoiceTrainingActive(false)
+            },
+        )
     }
 }
 

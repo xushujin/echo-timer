@@ -15,9 +15,12 @@ import com.echotimer.core.time.MonotonicClock
 import com.echotimer.core.time.StopwatchEngine
 import com.echotimer.core.time.StopwatchState
 import com.echotimer.core.voice.Announcer
-import com.echotimer.core.voice.SpeechCommandController
+import com.echotimer.core.settings.VoiceEngine
 import com.echotimer.core.voice.VoiceCommand
+import com.echotimer.core.voice.VoiceCommandSource
+import com.echotimer.core.voice.VoiceSourceFactory
 import com.echotimer.core.voice.VoiceStatus
+import com.echotimer.core.voice.offline.VoiceBackend
 import com.echotimer.data.HistoryRepository
 import com.echotimer.data.LapRecord
 import com.echotimer.data.SessionDraft
@@ -26,6 +29,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -40,6 +45,10 @@ data class TimerUiState(
     val voiceStatus: VoiceStatus = VoiceStatus.OFF,
     val rmsLevel: Float = 0f,
     val ttsAvailable: Boolean = true,
+    /** 当前实际使用的语音引擎。 */
+    val voiceBackend: VoiceBackend = VoiceBackend.NONE,
+    /** 已录制的离线口令条数。 */
+    val offlineTemplates: Int = 0,
 ) {
     val isRunning: Boolean get() = stopwatchState == StopwatchState.RUNNING
     val isPaused: Boolean get() = stopwatchState == StopwatchState.PAUSED
@@ -48,7 +57,7 @@ data class TimerUiState(
 
 /**
  * 计时页的编排层：把纯逻辑（[StopwatchEngine] / [AnnouncementScheduler]）、
- * 语音能力（[Announcer] / [SpeechCommandController]）和持久化（[HistoryRepository]）串起来。
+ * 语音能力（[Announcer] / [VoiceCommandSource]）和持久化（[HistoryRepository]）串起来。
  *
  * 这里不写任何"计时算法"，只做状态同步与副作用调度，因此核心逻辑可以脱离 Android 单测。
  */
@@ -57,7 +66,7 @@ class TimerViewModel(
     private val historyRepository: HistoryRepository,
     clock: MonotonicClock,
     private val announcer: Announcer,
-    speechFactory: (languageTag: String, onCommand: (VoiceCommand) -> Unit) -> SpeechCommandController,
+    private val voiceFactory: VoiceSourceFactory,
 ) : ViewModel() {
 
     private val engine = StopwatchEngine(clock)
@@ -66,9 +75,21 @@ class TimerViewModel(
     private val _uiState = MutableStateFlow(TimerUiState())
     val uiState: StateFlow<TimerUiState> = _uiState.asStateFlow()
 
-    private val speech: SpeechCommandController = speechFactory(currentSettings().recognitionLanguage) {
-        handleVoiceCommand(it)
-    }
+    /**
+     * 当前使用的语音来源。引擎偏好、系统能力、离线模板数量任一变化都会重建它，
+     * 所以这里不是 val，重建逻辑集中在 [ensureVoiceSource]。
+     */
+    private var voiceSource: VoiceCommandSource? = null
+    private val sourceFlow = MutableStateFlow<VoiceCommandSource?>(null)
+    private var voiceBackend: VoiceBackend = VoiceBackend.NONE
+    private var lastEngine: VoiceEngine? = null
+
+    /**
+     * 训练弹窗打开期间为 true。
+     * 麦克风同一时刻只能被一个 AudioRecord 占用，训练时继续监听会导致录音拿到静音，
+     * 所以这段时间要停掉监听，并在结束后恢复。
+     */
+    private var voiceTrainingActive = false
 
     private var ticker: Job? = null
     private var sessionStartedAtMs: Long = 0L
@@ -77,7 +98,9 @@ class TimerViewModel(
         scheduler.setInterval(currentSettings().announcementIntervalSeconds)
         observeSettings()
         observeAnnouncer()
+        ensureVoiceSource()
         observeSpeech()
+        observeVoiceTemplates()
         viewModelScope.launch { historyRepository.refresh() }
         _uiState.update { it.copy(ttsAvailable = announcer.available.value) }
     }
@@ -137,6 +160,12 @@ class TimerViewModel(
     fun onMicPermissionResult(granted: Boolean) {
         _uiState.update { it.copy(micPermissionGranted = granted) }
         syncSpeechState()
+    }
+
+    /** 训练弹窗打开/关闭时调用：训练期间让出麦克风。 */
+    fun setVoiceTrainingActive(active: Boolean) {
+        voiceTrainingActive = active
+        if (active) voiceSource?.stop() else syncSpeechState()
     }
 
     /** 界面上直接开关语音指令（与设置页写的是同一份设置）。 */
@@ -253,7 +282,8 @@ class TimerViewModel(
             settingsRepository.settings
                 .collect { settings ->
                     scheduler.setInterval(settings.announcementIntervalSeconds)
-                    speech.languageTag = settings.recognitionLanguage
+                    voiceSource?.languageTag = settings.recognitionLanguage
+                    ensureVoiceSource()
                     syncSpeechState()
                 }
         }
@@ -261,7 +291,7 @@ class TimerViewModel(
 
     private fun observeAnnouncer() {
         viewModelScope.launch {
-            announcer.speaking.collect { speaking -> speech.setSuspended(speaking) }
+            announcer.speaking.collect { speaking -> voiceSource?.setSuspended(speaking) }
         }
         viewModelScope.launch {
             announcer.available.collect { available ->
@@ -270,22 +300,72 @@ class TimerViewModel(
         }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeSpeech() {
         viewModelScope.launch {
-            speech.status.collect { status -> _uiState.update { it.copy(voiceStatus = status) } }
+            sourceFlow
+                .filterNotNull()
+                .flatMapLatest { it.status }
+                .collect { status -> _uiState.update { it.copy(voiceStatus = status) } }
         }
         viewModelScope.launch {
-            speech.rmsLevel.collect { level -> _uiState.update { it.copy(rmsLevel = level) } }
+            sourceFlow
+                .filterNotNull()
+                .flatMapLatest { it.rmsLevel }
+                .collect { level -> _uiState.update { it.copy(rmsLevel = level) } }
+        }
+    }
+
+    /** 录完一条离线口令后要立刻能用：模板数量变化时重建来源并同步监听状态。 */
+    private fun observeVoiceTemplates() {
+        viewModelScope.launch {
+            voiceFactory.templates.collect { templates ->
+                _uiState.update { it.copy(offlineTemplates = templates.size) }
+                ensureVoiceSource()
+                syncSpeechState()
+            }
+        }
+    }
+
+    /**
+     * 按当前设置与能力重建语音来源。
+     * 只有"后端真的变了"才重建，否则每次设置变化都重建会把正在进行的识别打断。
+     */
+    private fun ensureVoiceSource() {
+        val settings = currentSettings()
+        val backend = voiceFactory.backend(settings)
+        val engineChanged = lastEngine != null && lastEngine != settings.voiceEngine
+        if (voiceSource != null && backend == voiceBackend && !engineChanged) return
+
+        voiceSource?.release()
+        val created = voiceFactory.create(settings) { command -> handleVoiceCommand(command) }
+        voiceSource = created
+        voiceBackend = backend
+        lastEngine = settings.voiceEngine
+        sourceFlow.value = created
+        _uiState.update {
+            it.copy(voiceBackend = backend, offlineTemplates = voiceFactory.templates.value.size)
+        }
+        // 重建时如果正在播报，新来源也要立刻让麦，否则会把播报声当成口令。
+        created.setSuspended(announcer.speaking.value)
+        if (!voiceTrainingActive && settings.voiceCommandsEnabled && _uiState.value.micPermissionGranted) {
+            created.start()
         }
     }
 
     private fun syncSpeechState() {
         val settings = currentSettings()
         val granted = _uiState.value.micPermissionGranted
+        val source = voiceSource ?: return
+        // 训练中：保持静音，等弹窗关掉再恢复。
+        if (voiceTrainingActive) {
+            source.stop()
+            return
+        }
         if (settings.voiceCommandsEnabled && granted) {
-            speech.start()
+            source.start()
         } else {
-            speech.stop()
+            source.stop()
             if (settings.voiceCommandsEnabled && !granted) {
                 _uiState.update { it.copy(voiceStatus = VoiceStatus.PERMISSION_DENIED) }
             }
@@ -297,7 +377,7 @@ class TimerViewModel(
     override fun onCleared() {
         super.onCleared()
         stopTicker()
-        speech.release()
+        voiceSource?.release()
         // announcer 是应用级单例（另一个计时页也在用），这里不释放。
     }
 
@@ -313,7 +393,7 @@ class TimerViewModel(
                     historyRepository = container.historyRepository,
                     clock = container.clock,
                     announcer = container.announcer,
-                    speechFactory = container::createSpeechController,
+                    voiceFactory = container.voiceSourceFactory,
                 )
             }
         }

@@ -48,19 +48,19 @@ class SpeechCommandController(
     private val context: Context,
     languageTag: String,
     private val onCommand: (VoiceCommand) -> Unit,
-) {
+) : VoiceCommandSource {
 
     private val handler = Handler(Looper.getMainLooper())
 
     private val _status = MutableStateFlow(VoiceStatus.OFF)
-    val status: StateFlow<VoiceStatus> = _status.asStateFlow()
+    override val status: StateFlow<VoiceStatus> = _status.asStateFlow()
 
     /** 识别引擎上报的麦克风音量（dB），用于界面上的呼吸动画。 */
     private val _rmsLevel = MutableStateFlow(0f)
-    val rmsLevel: StateFlow<Float> = _rmsLevel.asStateFlow()
+    override val rmsLevel: StateFlow<Float> = _rmsLevel.asStateFlow()
 
     /** 识别语言，可在设置里切换，无需重建控制器。 */
-    var languageTag: String = languageTag
+    override var languageTag: String = languageTag
         set(value) {
             if (field == value) return
             field = value
@@ -76,7 +76,7 @@ class SpeechCommandController(
 
     private val restartTask = Runnable { listenNow() }
 
-    fun start() {
+    override fun start() {
         if (running) return
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             _status.value = VoiceStatus.UNAVAILABLE
@@ -88,7 +88,7 @@ class SpeechCommandController(
         handler.post(restartTask)
     }
 
-    fun stop() {
+    override fun stop() {
         running = false
         suspended = false
         handler.removeCallbacks(restartTask)
@@ -97,7 +97,7 @@ class SpeechCommandController(
         _status.value = VoiceStatus.OFF
     }
 
-    fun release() {
+    override fun release() {
         stop()
         recognizer?.destroy()
         recognizer = null
@@ -107,7 +107,7 @@ class SpeechCommandController(
      * 播报期间让出麦克风：置 true 立即取消当前识别，置 false 冷却一小段时间后重新监听。
      * 冷却期是必要的——TTS 尾音和扬声器余响会被麦克风拾到，否则会把"10 秒"识别成指令。
      */
-    fun setSuspended(value: Boolean) {
+    override fun setSuspended(value: Boolean) {
         if (suspended == value) return
         suspended = value
         if (!running) return

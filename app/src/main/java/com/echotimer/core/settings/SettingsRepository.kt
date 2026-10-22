@@ -56,6 +56,10 @@ class SettingsRepository(context: Context) {
             keepScreenOn = prefs.getBoolean(KEY_KEEP_SCREEN_ON, defaults.keepScreenOn),
             recognitionLanguage = prefs.getString(KEY_RECOGNITION_LANGUAGE, defaults.recognitionLanguage)
                 ?: defaults.recognitionLanguage,
+            voiceEngine = SettingsCodec.decodeVoiceEngine(prefs.getString(KEY_VOICE_ENGINE, null)),
+            offlineSensitivity = SettingsCodec.decodeSensitivity(
+                prefs.getString(KEY_OFFLINE_SENSITIVITY, null),
+            ),
         ).sanitized()
     }
 
@@ -70,6 +74,8 @@ class SettingsRepository(context: Context) {
             .putBoolean(KEY_AUTO_SAVE, settings.autoSaveSessions)
             .putBoolean(KEY_KEEP_SCREEN_ON, settings.keepScreenOn)
             .putString(KEY_RECOGNITION_LANGUAGE, settings.recognitionLanguage)
+            .putString(KEY_VOICE_ENGINE, SettingsCodec.encodeVoiceEngine(settings.voiceEngine))
+            .putString(KEY_OFFLINE_SENSITIVITY, SettingsCodec.encodeSensitivity(settings.offlineSensitivity))
             .apply()
     }
 
@@ -84,5 +90,7 @@ class SettingsRepository(context: Context) {
         const val KEY_AUTO_SAVE = "auto_save_sessions"
         const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
         const val KEY_RECOGNITION_LANGUAGE = "recognition_language"
+        const val KEY_VOICE_ENGINE = "voice_engine"
+        const val KEY_OFFLINE_SENSITIVITY = "offline_sensitivity"
     }
 }

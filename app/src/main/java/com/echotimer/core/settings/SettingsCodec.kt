@@ -10,4 +10,14 @@ object SettingsCodec {
 
     fun decodeThemeMode(raw: String?): ThemeMode =
         ThemeMode.entries.firstOrNull { it.name == raw } ?: ThemeMode.SYSTEM
+
+    fun encodeVoiceEngine(engine: VoiceEngine): String = engine.name
+
+    fun decodeVoiceEngine(raw: String?): VoiceEngine =
+        VoiceEngine.entries.firstOrNull { it.name == raw } ?: VoiceEngine.AUTO
+
+    fun encodeSensitivity(sensitivity: OfflineSensitivity): String = sensitivity.name
+
+    fun decodeSensitivity(raw: String?): OfflineSensitivity =
+        OfflineSensitivity.entries.firstOrNull { it.name == raw } ?: OfflineSensitivity.MEDIUM
 }
