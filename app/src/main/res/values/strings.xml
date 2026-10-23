@@ -50,6 +50,8 @@
     <string name="voice_training_recorded_hint">建议每条口令录 2 遍：两遍之间的差异用来定匹配门限，识别会更稳。</string>
     <string name="voice_training_hit">识别为「%1$s」 · 距离 %2$s / 门限 %3$s</string>
     <string name="voice_training_miss">没匹配上 · 最接近「%1$s」，距离 %2$s / 门限 %3$s（差 %4$s）</string>
+    <string name="voice_training_ambiguous">没敢认：「%1$s」%2$s 与「%3$s」%4$s 太接近</string>
+    <string name="voice_training_ambiguous_hint">乱说话时各口令的距离会挤在一起，这条会被挡掉。如果正常说也这样，说明这两条口令发音太像，换个说法或再录一遍。</string>
     <string name="voice_training_miss_hint">距离比门限大就判为"没听懂"。差得多说明两次录音差异大，建议再录一遍；只差一点就把灵敏度调高。</string>
     <string name="voice_training_no_speech_detail">没检测到说话：峰值 %1$s dBFS，触发门限 %2$s dBFS</string>
     <string name="voice_training_no_speech_hint">峰值要高于触发门限才会开始录音。靠近手机 20~30 厘米说清楚；若峰值一直在 -60 以下，可能是麦克风被其它应用占用或权限被拒。</string>

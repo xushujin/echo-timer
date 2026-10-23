@@ -9,6 +9,36 @@ data class VoiceMatch(
     val threshold: Float,
 )
 
+/** 没匹配上的原因，界面据此给出不同的解释。 */
+enum class MatchRejection {
+    /** 还没有任何模板。 */
+    NO_TEMPLATES,
+
+    /** 最近的距离也超过门限——不像任何一条口令。 */
+    TOO_FAR,
+
+    /** 两个口令都很像，不敢认（乱说话时最常见）。 */
+    AMBIGUOUS,
+}
+
+/** 匹配的完整判定，包含"为什么没认"的信息。 */
+sealed interface MatchDecision {
+    data class Accepted(
+        val command: VoiceCommand,
+        val distance: Float,
+        val threshold: Float,
+    ) : MatchDecision
+
+    data class Rejected(
+        val reason: MatchRejection,
+        val nearest: VoiceCommand?,
+        val distance: Float,
+        val threshold: Float,
+        /** 除最近那条之外，第二像的**不同口令**的距离；没有其它口令时为 null。 */
+        val runnerUpDistance: Float?,
+    ) : MatchDecision
+}
+
 /** 模板之间的统计量，用于设置门限与在界面上解释"为什么没匹配"。 */
 data class MatchStats(
     /** 不同口令之间的最小距离；不足两条命令时为 null。 */
@@ -18,36 +48,40 @@ data class MatchStats(
     val threshold: Float,
     val bestCommand: VoiceCommand?,
     val bestDistance: Float,
+    /** 第二像的**不同口令**的距离。 */
+    val runnerUpDistance: Float?,
 )
 
 /**
  * 模板匹配。
  *
- * 门限不再是一个拍脑袋的常数，而是**用你自己的模板量出来**的：
+ * 门限用你自己的模板量出来，并且**必须"明显更近"才算命中**：
  *
- * - `类间距离` = 不同口令之间的最小距离（决定"最多能放宽到多少"）；
- * - `类内距离` = 同一口令两遍录音之间的距离（决定"至少要放宽到多少"）。
+ * 1. 距离 ≤ 门限。门限 = min(类内 × 2.0, 类间 × 0.8)，只有单遍模板时退回 类间 × 系数；
+ * 2. 距离 ≤ 第二像的**不同口令** × [MARGIN]。
  *
- * 规则：
- * 1. 有类内距离（某条口令录了 2 遍）→ 门限 = min(类内 × 2.0, 类间 × 0.8)；
- *    这样既能容忍同一句话的正常波动，又不会跨到别的口令上。
- * 2. 只有单遍模板 → 退回 类间 × 灵敏度系数。
- * 3. 只录了 1 条命令 → 没有类间距离可用，用兜底门限。
+ * 第 2 条是关键：乱说话时所有口令的距离都差不多（比如 0.87 / 0.95），
+ * 只看绝对门限很容易误命中；要求"至少比第二像的近 28%"能挡掉绝大多数这种情况。
  *
- * 训练弹窗会把这三个数字都显示出来，所以"为什么没匹配"是可以被解释的，
- * 而不是只有一句"没识别到"。
+ * DTW 本身还有长度闸门与带宽约束（见 [Dtw]），避免把不像的语音硬凑成一样。
  */
 object VoiceMatcher {
 
     /** 只有单遍模板时，类间距离的多少比例以内算命中。 */
-    const val DEFAULT_RATIO = 0.65f
+    const val DEFAULT_RATIO = 0.55f
 
-    /** 阈值的安全上下限，防止极端模板把门限推到不可用的位置。 */
-    const val MIN_THRESHOLD = 1.0f
+    /** 阈值的安全上下限。下限不能太高，否则会盖掉"类内 × 2"的数据驱动结果。 */
+    const val MIN_THRESHOLD = 0.5f
     const val MAX_THRESHOLD = 6f
 
-    /** 只有一条命令（或一条模板）时的兜底门限。 */
-    const val FALLBACK_THRESHOLD = 2.5f
+    /**
+     * 只有一条命令（或一条模板）时的兜底门限。
+     * 没有第二个类就没有参照，只能取一个偏保守的值——录满 5 条口令才准。
+     */
+    const val FALLBACK_THRESHOLD = 1.0f
+
+    /** 最近的距离必须 ≤ 第二像的不同口令 × 该系数，否则判为"太接近、不敢认"。 */
+    const val MARGIN = 0.72f
 
     /** 不同指令之间的最小距离；不足两条指令时返回 null。 */
     fun interClassDistance(templates: List<VoiceTemplate>): Float? {
@@ -86,29 +120,23 @@ object VoiceMatcher {
         }
     }
 
-    /** 诊断信息：门限 + 最近的一条模板。 */
-    fun stats(
+    /** 完整判定：命中 / 太远 / 太接近。 */
+    fun decide(
         frames: List<FloatArray>,
         templates: List<VoiceTemplate>,
         ratio: Float = DEFAULT_RATIO,
-    ): MatchStats {
-        val best = ranking(frames, templates).firstOrNull()
-        return MatchStats(
-            interClass = interClassDistance(templates),
-            sameClass = sameClassDistance(templates),
-            threshold = threshold(templates, ratio),
-            bestCommand = best?.first,
-            bestDistance = best?.second ?: Float.MAX_VALUE,
-        )
-    }
+    ): MatchDecision {
+        if (frames.isEmpty() || templates.isEmpty()) {
+            return MatchDecision.Rejected(
+                reason = MatchRejection.NO_TEMPLATES,
+                nearest = null,
+                distance = Float.MAX_VALUE,
+                threshold = threshold(templates, ratio),
+                runnerUpDistance = null,
+            )
+        }
 
-    /** 找出最接近的模板；超过门限返回 null（宁可不响应，也不要误触发）。 */
-    fun match(
-        frames: List<FloatArray>,
-        templates: List<VoiceTemplate>,
-        ratio: Float = DEFAULT_RATIO,
-    ): VoiceMatch? {
-        if (frames.isEmpty() || templates.isEmpty()) return null
+        val limit = threshold(templates, ratio)
         var best: VoiceTemplate? = null
         var bestDistance = Float.MAX_VALUE
         for (template in templates) {
@@ -118,10 +146,75 @@ object VoiceMatcher {
                 best = template
             }
         }
-        val winner = best ?: return null
-        val limit = threshold(templates, ratio)
-        if (bestDistance > limit) return null
-        return VoiceMatch(command = winner.command, distance = bestDistance, threshold = limit)
+
+        val winner = best
+        if (winner == null || bestDistance == Float.MAX_VALUE) {
+            return MatchDecision.Rejected(
+                reason = MatchRejection.TOO_FAR,
+                nearest = null,
+                distance = Float.MAX_VALUE,
+                threshold = limit,
+                runnerUpDistance = null,
+            )
+        }
+
+        // 第二像的"不同口令"：同一口令的另一遍不算，否则永远比不过自己。
+        var runnerUp = Float.MAX_VALUE
+        for (template in templates) {
+            if (template.command == winner.command) continue
+            val distance = Dtw.distance(frames, template.frames)
+            if (distance < runnerUp) runnerUp = distance
+        }
+        val runnerUpOrNull = if (runnerUp == Float.MAX_VALUE) null else runnerUp
+
+        if (bestDistance > limit) {
+            return MatchDecision.Rejected(
+                reason = MatchRejection.TOO_FAR,
+                nearest = winner.command,
+                distance = bestDistance,
+                threshold = limit,
+                runnerUpDistance = runnerUpOrNull,
+            )
+        }
+        if (runnerUpOrNull != null && bestDistance > runnerUpOrNull * MARGIN) {
+            return MatchDecision.Rejected(
+                reason = MatchRejection.AMBIGUOUS,
+                nearest = winner.command,
+                distance = bestDistance,
+                threshold = limit,
+                runnerUpDistance = runnerUpOrNull,
+            )
+        }
+        return MatchDecision.Accepted(winner.command, bestDistance, limit)
+    }
+
+    /** 只要结果：命中返回 [VoiceMatch]，否则 null（宁可不响应，也不要误触发）。 */
+    fun match(
+        frames: List<FloatArray>,
+        templates: List<VoiceTemplate>,
+        ratio: Float = DEFAULT_RATIO,
+    ): VoiceMatch? = when (val decision = decide(frames, templates, ratio)) {
+        is MatchDecision.Accepted -> VoiceMatch(decision.command, decision.distance, decision.threshold)
+        is MatchDecision.Rejected -> null
+    }
+
+    /** 诊断信息：门限 + 最近与次近。 */
+    fun stats(
+        frames: List<FloatArray>,
+        templates: List<VoiceTemplate>,
+        ratio: Float = DEFAULT_RATIO,
+    ): MatchStats {
+        val ranking = ranking(frames, templates)
+        val best = ranking.firstOrNull()
+        val runnerUp = ranking.firstOrNull { it.first != best?.first }?.second
+        return MatchStats(
+            interClass = interClassDistance(templates),
+            sameClass = sameClassDistance(templates),
+            threshold = threshold(templates, ratio),
+            bestCommand = best?.first,
+            bestDistance = best?.second ?: Float.MAX_VALUE,
+            runnerUpDistance = runnerUp,
+        )
     }
 
     /** 调试/训练页用：列出每条模板的距离（升序），方便判断哪条容易混。 */

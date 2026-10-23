@@ -31,7 +31,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.echotimer.R
 import com.echotimer.core.settings.OfflineSensitivity
 import com.echotimer.core.voice.VoiceCommand
-import com.echotimer.core.voice.offline.MatchStats
+import com.echotimer.core.voice.offline.MatchDecision
+import com.echotimer.core.voice.offline.MatchRejection
 import com.echotimer.core.voice.offline.OfflineVoiceStore
 import com.echotimer.core.voice.offline.VoiceEnroller
 import com.echotimer.core.voice.offline.VoiceMatcher
@@ -184,7 +185,14 @@ private sealed interface TrainingOutcome {
 
     data class Hit(val command: VoiceCommand, val distance: Float, val threshold: Float) : TrainingOutcome
 
-    data class Miss(val nearest: VoiceCommand?, val distance: Float, val threshold: Float) : TrainingOutcome
+    data class Miss(
+        val nearest: VoiceCommand?,
+        val distance: Float,
+        val threshold: Float,
+        val reason: MatchRejection,
+        val runnerUpCommand: VoiceCommand? = null,
+        val runnerUpDistance: Float? = null,
+    ) : TrainingOutcome
 
     data class NoSpeech(val peakDbfs: Double, val triggerRms: Double, val waitedMs: Long) : TrainingOutcome
 
@@ -244,10 +252,19 @@ private fun outcomeHeadline(outcome: TrainingOutcome): String = when (outcome) {
 
     is TrainingOutcome.Miss -> {
         val nearest = outcome.nearest
-        if (nearest == null) {
-            stringResource(R.string.voice_training_test_empty)
-        } else {
-            stringResource(
+        val runnerUp = outcome.runnerUpCommand
+        when {
+            nearest == null -> stringResource(R.string.voice_training_test_empty)
+
+            outcome.reason == MatchRejection.AMBIGUOUS && runnerUp != null -> stringResource(
+                R.string.voice_training_ambiguous,
+                stringResource(nearest.labelRes()),
+                formatDecimal(outcome.distance),
+                stringResource(runnerUp.labelRes()),
+                formatDecimal(outcome.runnerUpDistance ?: 0f),
+            )
+
+            else -> stringResource(
                 R.string.voice_training_miss,
                 stringResource(nearest.labelRes()),
                 formatDecimal(outcome.distance),
@@ -269,7 +286,11 @@ private fun outcomeHeadline(outcome: TrainingOutcome): String = when (outcome) {
 @Composable
 private fun outcomeDetail(outcome: TrainingOutcome): String? = when (outcome) {
     is TrainingOutcome.NoSpeech -> stringResource(R.string.voice_training_no_speech_hint)
-    is TrainingOutcome.Miss -> stringResource(R.string.voice_training_miss_hint)
+    is TrainingOutcome.Miss -> if (outcome.reason == MatchRejection.AMBIGUOUS) {
+        stringResource(R.string.voice_training_ambiguous_hint)
+    } else {
+        stringResource(R.string.voice_training_miss_hint)
+    }
     is TrainingOutcome.Recorded -> stringResource(R.string.voice_training_recorded_hint)
     else -> null
 }
@@ -461,15 +482,35 @@ private fun testOutcome(
     templates: List<VoiceTemplate>,
     sensitivity: OfflineSensitivity,
 ): TrainingOutcome {
-    if (templates.isEmpty()) return TrainingOutcome.Miss(null, 0f, 0f)
-    val stats: MatchStats = VoiceMatcher.stats(frames, templates, sensitivity.ratio)
-    val nearest = stats.bestCommand ?: return TrainingOutcome.Miss(null, 0f, stats.threshold)
-    return if (stats.bestDistance <= stats.threshold) {
-        TrainingOutcome.Hit(nearest, stats.bestDistance, stats.threshold)
-    } else {
-        TrainingOutcome.Miss(nearest, stats.bestDistance, stats.threshold)
+    if (templates.isEmpty()) {
+        return TrainingOutcome.Miss(null, 0f, 0f, MatchRejection.NO_TEMPLATES)
+    }
+    return when (val decision = VoiceMatcher.decide(frames, templates, sensitivity.ratio)) {
+        is MatchDecision.Accepted -> TrainingOutcome.Hit(
+            decision.command,
+            decision.distance,
+            decision.threshold,
+        )
+
+        is MatchDecision.Rejected -> TrainingOutcome.Miss(
+            nearest = decision.nearest,
+            distance = decision.distance,
+            threshold = decision.threshold,
+            reason = decision.reason,
+            runnerUpCommand = runnerUpCommand(frames, templates, decision.nearest),
+            runnerUpDistance = decision.runnerUpDistance,
+        )
     }
 }
+
+/** 找出"第二像的不同口令"的命令名，用于解释"太接近"。 */
+private fun runnerUpCommand(
+    frames: List<FloatArray>,
+    templates: List<VoiceTemplate>,
+    nearest: VoiceCommand?,
+): VoiceCommand? = VoiceMatcher.ranking(frames, templates)
+    .firstOrNull { it.first != nearest }
+    ?.first
 
 private fun VoiceCommand.labelRes(): Int = when (this) {
     VoiceCommand.START -> R.string.timer_action_start
