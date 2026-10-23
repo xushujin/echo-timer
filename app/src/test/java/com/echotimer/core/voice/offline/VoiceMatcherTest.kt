@@ -20,14 +20,39 @@ class VoiceMatcherTest {
         )
 
     private val start = template(VoiceCommand.START, 1f)
-    private val stop = template(VoiceCommand.STOP, 4f)
-    private val lap = template(VoiceCommand.LAP, 8f)
+    private val startAgain = template(VoiceCommand.START, 2f)
+    private val stop = template(VoiceCommand.STOP, 8f)
 
     @Test
     fun interClassDistanceUsesDifferentCommandsOnly() {
         val sameCommandTwice = listOf(start, template(VoiceCommand.START, 1.2f))
         assertNull("同一命令不参与类间距离", VoiceMatcher.interClassDistance(sameCommandTwice))
         assertNotNull(VoiceMatcher.interClassDistance(listOf(start, stop)))
+    }
+
+    @Test
+    fun sameClassDistanceUsesSameCommandOnly() {
+        assertNull("没有同命令的两遍录音时无类内距离", VoiceMatcher.sameClassDistance(listOf(start, stop)))
+        val same = VoiceMatcher.sameClassDistance(listOf(start, startAgain))
+        requireNotNull(same)
+        assertTrue(same > 0f)
+    }
+
+    @Test
+    fun twoTakesTightenThresholdBetweenClasses() {
+        val single = listOf(start, stop)
+        val doubled = listOf(start, startAgain, stop)
+
+        val same = VoiceMatcher.sameClassDistance(doubled)
+        val inter = VoiceMatcher.interClassDistance(doubled)
+        requireNotNull(same)
+        requireNotNull(inter)
+
+        val threshold = VoiceMatcher.threshold(doubled)
+        assertTrue("门限要能容忍同一句话的两遍差异", threshold > same)
+        assertTrue("门限不能跨到别的口令上", threshold < inter)
+        // 单遍模板走"类间 × 系数"的兜底逻辑，与两遍的数据驱动结果应当不同
+        assertTrue(VoiceMatcher.threshold(single) != threshold)
     }
 
     @Test
@@ -46,7 +71,7 @@ class VoiceMatcherTest {
 
     @Test
     fun exactMatchWins() {
-        val match = VoiceMatcher.match(stop.frames, listOf(start, stop, lap))
+        val match = VoiceMatcher.match(stop.frames, listOf(start, stop))
         requireNotNull(match)
         assertEquals(VoiceCommand.STOP, match.command)
         assertEquals(0f, match.distance, 1e-4f)
@@ -55,12 +80,21 @@ class VoiceMatcherTest {
     @Test
     fun unrelatedSoundIsRejected() {
         val noise = List(12) { floatArrayOf(50f, -60f, 70f) }
-        assertNull(VoiceMatcher.match(noise, listOf(start, stop, lap)))
+        assertNull(VoiceMatcher.match(noise, listOf(start, stop)))
+    }
+
+    @Test
+    fun statsExposeNumbersForDiagnostics() {
+        val stats = VoiceMatcher.stats(stop.frames, listOf(start, startAgain, stop))
+        assertEquals(VoiceCommand.STOP, stats.bestCommand)
+        assertNotNull(stats.interClass)
+        assertNotNull(stats.sameClass)
+        assertTrue(stats.threshold > 0f)
     }
 
     @Test
     fun rankingSortsByDistance() {
-        val ranking = VoiceMatcher.ranking(stop.frames, listOf(start, stop, lap))
+        val ranking = VoiceMatcher.ranking(stop.frames, listOf(start, stop))
         assertEquals(VoiceCommand.STOP, ranking.first().first)
         assertTrue(ranking.first().second <= ranking.last().second)
     }

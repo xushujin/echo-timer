@@ -64,7 +64,12 @@ class AudioCapture(val sampleRate: Int = SAMPLE_RATE) {
         }
     }
 
-    /** 阻塞读取一块；出错返回 null。 */
+    /**
+     * 阻塞读取一块；真出错（返回负数）才返回 null。
+     *
+     * 注意 `read` 偶尔会返回 0（缓冲区还没填满），这时要当成"一块静音"继续跑，
+     * 不能直接结束监听——否则一次 0 就会让语音功能悄悄停掉。
+     */
     fun readChunk(): ShortArray? {
         val current = record ?: return null
         val buffer = ShortArray(chunkSamples)
@@ -73,7 +78,7 @@ class AudioCapture(val sampleRate: Int = SAMPLE_RATE) {
         } catch (_: IllegalStateException) {
             return null
         }
-        return if (read > 0) buffer else null
+        return if (read < 0) null else buffer
     }
 
     fun stop() {

@@ -21,6 +21,12 @@ object AudioLevel {
      * 系统识别上报的 rmsdB 大约在 -2..10 之间，这里对齐到同一量级，
      * 界面上的呼吸动画不需要为两种引擎写两套。
      */
+    /** 相对满量程的分贝（-90..0），用于诊断信息展示。 */
+    fun toDbfs(rms: Double): Double {
+        if (rms <= 0.5) return -90.0
+        return (20.0 * log10(rms / 32_768.0)).coerceIn(-90.0, 0.0)
+    }
+
     fun toUiDb(rms: Double): Float {
         if (rms <= 1.0) return -2f
         val db = 20.0 * log10(rms / 1_000.0)

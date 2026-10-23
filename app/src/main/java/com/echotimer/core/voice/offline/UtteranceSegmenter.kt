@@ -14,11 +14,11 @@ package com.echotimer.core.voice.offline
  */
 class UtteranceSegmenter(
     private val chunkMs: Int = 20,
-    private val triggerRatio: Double = 3.5,
-    private val minTriggerRms: Double = 600.0,
+    private val triggerRatio: Double = 2.5,
+    private val minTriggerRms: Double = 300.0,
     private val tailSilenceMs: Int = 400,
     private val maxUtteranceMs: Int = 2_500,
-    initialNoiseFloor: Double = 250.0,
+    initialNoiseFloor: Double = 120.0,
 ) {
 
     sealed interface Event {

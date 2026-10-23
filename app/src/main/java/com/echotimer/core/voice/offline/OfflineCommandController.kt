@@ -103,6 +103,8 @@ class OfflineCommandController(
         val buffer = UtteranceBuffer(
             UtteranceSegmenter(
                 chunkMs = audio.chunkDurationMs,
+                triggerRatio = 2.5,
+                minTriggerRms = 300.0,
                 initialNoiseFloor = noiseFloor,
             ),
         )
@@ -120,7 +122,8 @@ class OfflineCommandController(
                 val rms = AudioLevel.rms(chunk)
                 _rmsLevel.value = AudioLevel.toUiDb(rms)
                 val utterance = buffer.accept(chunk, rms) ?: continue
-                val trimmed = Mfcc.trimSilence(utterance)
+                // 裁剪阈值放宽到 300：轻声说话时 600 会把整段裁光，表现为"没反应"。
+                val trimmed = Mfcc.trimSilence(utterance, threshold = 300)
                 if (trimmed.size < MIN_SAMPLES) continue
                 val frames = Mfcc.extract(trimmed)
                 val templates = store.templates.value
@@ -153,7 +156,7 @@ class OfflineCommandController(
         }
         if (count == 0) return DEFAULT_NOISE_FLOOR
         // 取平均再抬一点，避免把偶发的环境声当成语音。
-        return (sum / count * 1.2).coerceIn(MIN_NOISE_FLOOR, MAX_NOISE_FLOOR)
+        return (sum / count * 1.5).coerceIn(MIN_NOISE_FLOOR, MAX_NOISE_FLOOR)
     }
 
     private suspend fun withContextMain(block: () -> Unit) {
@@ -165,8 +168,8 @@ class OfflineCommandController(
         const val MIN_SAMPLES = 1_920
         const val COMMAND_DEBOUNCE_MS = 1_200L
         const val CALIBRATION_CHUNKS = 50
-        const val DEFAULT_NOISE_FLOOR = 250.0
-        const val MIN_NOISE_FLOOR = 60.0
-        const val MAX_NOISE_FLOOR = 2_000.0
+        const val DEFAULT_NOISE_FLOOR = 120.0
+        const val MIN_NOISE_FLOOR = 40.0
+        const val MAX_NOISE_FLOOR = 800.0
     }
 }
