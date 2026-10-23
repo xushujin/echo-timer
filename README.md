@@ -5,7 +5,7 @@
 一个不依赖任何第三方 UI 库 / 依赖注入框架的秒表应用：计时过程中按你设定的时间点用语音报时，
 并且可以用「开始」「结束」这类口令直接控制计时。计时结果以多组记录的形式保存在本机。
 
-当前版本：1.1.0
+当前版本：1.2.0
 
 ---
 
@@ -38,6 +38,7 @@
 | 离线口令识别 | 设备没有系统语音识别服务时（国行 ColorOS / HyperOS 等），可录制 5 条口令，之后完全在本机匹配，不联网、不依赖任何系统服务 |
 | 多组历史记录 | 每次结束自动入库（可关闭），带计次明细（最后一次在最前），支持重命名、删除 |
 | 天梯榜 | 自定义多个榜单（名称唯一），输入或选择姓名后开始不计次的挑战（**同样按设定间隔报时**）；支持**手工录入**成绩；只有超过原记录才更新，榜单按秒数降序 |
+| 榜单只读 | 设置里「允许修改榜单」默认关闭：关闭时不能手工录入、不能删除成绩或榜单，成绩只能靠真实挑战产生（新建榜单与挑战不受影响） |
 | 榜单分享 | 把整个榜单导出成一张 PNG（第一名皇冠、最后一名整行标红，配色跟随当前主题），可分享到任意应用或存进相册 |
 | 拟态界面 | 3 套配色（石墨 / 暖沙 / 雾青）× 明暗两态，全局切换立即生效 |
 | 关于页 | 应用名、版本号、技术栈、支持范围、权限说明 |
@@ -55,7 +56,7 @@
 | 数据 | 手写 `SQLiteOpenHelper` + 显式版本迁移（未使用 Room） |
 | 语音合成 | 系统 `TextToSpeech` |
 | 语音识别 | 系统 `SpeechRecognizer`（`RecognitionService`），或自研离线口令匹配 |
-| 测试 | JUnit4（112 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
+| 测试 | JUnit4（114 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
 
 版本号在构建脚本里只有一处定义（`app/build.gradle.kts` 的 `appVersionName` / `appVersionCode`），
 关于页通过 `BuildConfig` 读取；`tools/check_consistency.py` 会核对构建脚本、README 与关于页三者是否一致。
@@ -117,7 +118,7 @@ app/src/main/java/com/echotimer/
     ├── share/                   # 榜单分享图渲染（android.graphics）+ 分享/存相册
     ├── screens/                 # 计时 / 记录 / 天梯 / 挑战 / 设置 / 关于
     └── theme/                   # Compose 主题适配
-app/src/test/java/com/echotimer/ # 112 个 JVM 单测
+app/src/test/java/com/echotimer/ # 114 个 JVM 单测
 tools/
 ├── verify_migrations.py         # 用真实 sqlite3 验证迁移
 └── check_consistency.py         # 文档 / 构建脚本 / 代码一致性检查
@@ -337,6 +338,9 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
   配色跟随当前主题，第一名画皇冠、最后一名整行标红；超过 40 人时只画前 40 名并注明总人数。
   图片可分享到任意应用，Android 10 及以上还可直接存进相册 `Pictures/EchoTimer`。
 - 删除榜单会级联删除其全部成绩。
+- **修改权限**：设置 →「天梯榜」→「允许修改榜单」默认**关闭**（只读）。
+  关闭时：手工录入、删除成绩、删除榜单全部隐藏，榜单详情页显示一行锁定说明；
+  新建榜单与「开始挑战」仍然可用——也就是说成绩只能靠真的跑一次来产生，防止手改分数或误删。
 
 ## 语音指令规则
 
@@ -419,7 +423,7 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
   - `OldTargetApi`：CI 镜像会随平台更新预装更新的 Android platform，而 lint 在"未使用最新 API"时报错，
     会让发版被环境升级卡住。这里忽略该检查（项目当前 targetSdk = 36），改版时按需手动检查目标 API。
 
-### 单元测试（112 个，全部通过）
+### 单元测试（114 个，全部通过）
 
 | 测试类 | 用例数 | 覆盖点 |
 | --- | --- | --- |
@@ -442,6 +446,7 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
 | `UtteranceSegmenterTest` | 5 | 静音不触发、说完即结束、超长强制结束、噪声底自适应、reset |
 | `VoiceEngineResolverTest` | 5 | 自动/系统/离线三种偏好的完整组合 |
 | `VoiceSettingsCodecTest` | 6 | 引擎与灵敏度往返、脏数据回落、默认值、sanitize 保留 |
+| `LeaderboardPermissionTest` | 2 | 榜单默认只读、sanitize 保留修改权限 |
 
 ### 真实引擎验证（迁移）
 
@@ -498,7 +503,7 @@ PASS  删除榜单时级联删除成绩
 **已验证**
 
 - 编译（debug / release）、Kotlin 零警告、lint 零问题
-- 112 个单元测试全部通过
+- 114 个单元测试全部通过
 - 真实 `sqlite3` 上的迁移与数据保留、级联删除
 - release APK 构建、签名、清单与权限核对（两条签名通道 + CI 缺签名保护）
 
@@ -534,6 +539,13 @@ PASS  删除榜单时级联删除成绩
 ---
 
 ## 变更记录
+
+### v1.2.0
+
+- 新增**榜单修改权限**开关（设置 →「天梯榜」），默认**关闭**（只读）：
+  关闭时隐藏手工录入、删除成绩、删除榜单，详情页显示锁定说明；
+  新建榜单与「开始挑战」不受影响，成绩只能靠真实挑战产生。
+- 版本号 1.2.0（versionCode 5）。
 
 ### v1.1.0
 

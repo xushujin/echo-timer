@@ -184,6 +184,10 @@
     <string name="settings_grant">去授权</string>
     <string name="settings_voice_language">识别语言</string>
     <string name="settings_section_other">其他</string>
+    <string name="settings_section_leaderboard">天梯榜</string>
+    <string name="settings_leaderboard_editable">允许修改榜单</string>
+    <string name="settings_leaderboard_editable_sub">关闭时榜单只读：不能手工录入成绩，也不能删除成绩或榜单；新建榜单与「开始挑战」仍然可用。</string>
+    <string name="leaderboard_locked_hint">榜单已锁定：成绩只能通过「开始挑战」产生，不能手工录入或删除。可在设置里打开「允许修改榜单」。</string>
     <string name="settings_auto_save">结束后自动保存</string>
     <string name="settings_keep_screen_on">计时时保持屏幕常亮</string>
     <string name="settings_speak_start_stop">播报开始 / 暂停 / 结束</string>

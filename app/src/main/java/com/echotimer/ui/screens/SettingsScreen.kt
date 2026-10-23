@@ -341,6 +341,26 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(14.dp))
 
+        // ---------------- 天梯榜 ----------------
+        NeumorphicCard(modifier = Modifier.fillMaxWidth()) {
+            SectionTitle(stringResource(R.string.settings_section_leaderboard))
+            Spacer(Modifier.height(14.dp))
+            SettingRow(
+                title = stringResource(R.string.settings_leaderboard_editable),
+                subtitle = stringResource(R.string.settings_leaderboard_editable_sub),
+                control = {
+                    NeumorphicToggle(
+                        checked = settings.leaderboardEditable,
+                        onCheckedChange = { onEdit ->
+                            onUpdate(settings.copy(leaderboardEditable = onEdit))
+                        },
+                    )
+                },
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
         // ---------------- 其他 ----------------
         NeumorphicCard(modifier = Modifier.fillMaxWidth()) {
             SectionTitle(stringResource(R.string.settings_section_other))

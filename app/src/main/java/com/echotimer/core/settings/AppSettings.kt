@@ -61,6 +61,11 @@ data class AppSettings(
     val voiceEngine: VoiceEngine = VoiceEngine.AUTO,
     /** 离线口令识别灵敏度。 */
     val offlineSensitivity: OfflineSensitivity = OfflineSensitivity.MEDIUM,
+    /**
+     * 是否允许修改榜单数据（手工录入、删除成绩、删除榜单）。
+     * 默认关闭 = 只读：成绩只能通过"开始挑战"产生，防止误删或手动改分。
+     */
+    val leaderboardEditable: Boolean = false,
 ) {
 
     /** 归一化：非法值回落默认，保证从磁盘读到的脏数据不会把界面带崩。 */

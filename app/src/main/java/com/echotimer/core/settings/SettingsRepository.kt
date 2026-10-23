@@ -60,6 +60,10 @@ class SettingsRepository(context: Context) {
             offlineSensitivity = SettingsCodec.decodeSensitivity(
                 prefs.getString(KEY_OFFLINE_SENSITIVITY, null),
             ),
+            leaderboardEditable = prefs.getBoolean(
+                KEY_LEADERBOARD_EDITABLE,
+                defaults.leaderboardEditable,
+            ),
         ).sanitized()
     }
 
@@ -76,6 +80,7 @@ class SettingsRepository(context: Context) {
             .putString(KEY_RECOGNITION_LANGUAGE, settings.recognitionLanguage)
             .putString(KEY_VOICE_ENGINE, SettingsCodec.encodeVoiceEngine(settings.voiceEngine))
             .putString(KEY_OFFLINE_SENSITIVITY, SettingsCodec.encodeSensitivity(settings.offlineSensitivity))
+            .putBoolean(KEY_LEADERBOARD_EDITABLE, settings.leaderboardEditable)
             .apply()
     }
 
@@ -92,5 +97,6 @@ class SettingsRepository(context: Context) {
         const val KEY_RECOGNITION_LANGUAGE = "recognition_language"
         const val KEY_VOICE_ENGINE = "voice_engine"
         const val KEY_OFFLINE_SENSITIVITY = "offline_sensitivity"
+        const val KEY_LEADERBOARD_EDITABLE = "leaderboard_editable"
     }
 }

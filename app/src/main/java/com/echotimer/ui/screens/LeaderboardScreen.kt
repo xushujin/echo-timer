@@ -90,6 +90,8 @@ fun LeaderboardTab(
     entries: List<LeaderboardEntry>,
     route: LeaderboardRoute,
     challenge: ChallengeState?,
+    /** 是否允许改榜单数据（手工录入 / 删除）；关闭时只读。 */
+    editable: Boolean,
     onCreateBoard: suspend (String) -> CreateBoardResult,
     onDeleteBoard: (Long) -> Unit,
     onOpenBoard: (Long) -> Unit,
@@ -125,6 +127,7 @@ fun LeaderboardTab(
             onStartChallenge = { player -> onStartChallenge(board, player) },
             onManualSubmit = { player, ms -> onManualSubmit(board.id, player, ms) },
             onDeleteEntry = onDeleteEntry,
+            editable = editable,
             modifier = modifier,
         )
     } else {
@@ -256,6 +259,7 @@ private fun BoardDetailScreen(
     onStartChallenge: (String) -> Unit,
     onManualSubmit: suspend (String, Long) -> SubmitResult,
     onDeleteEntry: (Long) -> Unit,
+    editable: Boolean,
     modifier: Modifier,
 ) {
     val colors = LocalEchoColors.current
@@ -340,15 +344,17 @@ private fun BoardDetailScreen(
                 color = colors.accent,
                 fontSize = 13.sp,
             )
-            Spacer(Modifier.width(14.dp))
-            Text(
-                text = stringResource(R.string.leaderboard_delete),
-                modifier = Modifier
-                    .clickable { showDeleteDialog = true }
-                    .padding(vertical = 4.dp),
-                color = colors.danger,
-                fontSize = 13.sp,
-            )
+            if (editable) {
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    text = stringResource(R.string.leaderboard_delete),
+                    modifier = Modifier
+                        .clickable { showDeleteDialog = true }
+                        .padding(vertical = 4.dp),
+                    color = colors.danger,
+                    fontSize = 13.sp,
+                )
+            }
         }
         Spacer(Modifier.height(10.dp))
         Text(
@@ -386,12 +392,24 @@ private fun BoardDetailScreen(
                     selected = true,
                     onClick = { showStartDialog = true },
                 )
-                NeumorphicChip(
-                    label = stringResource(R.string.leaderboard_manual),
-                    selected = false,
-                    onClick = { showManualDialog = true },
-                )
+                if (editable) {
+                    NeumorphicChip(
+                        label = stringResource(R.string.leaderboard_manual),
+                        selected = false,
+                        onClick = { showManualDialog = true },
+                    )
+                }
             }
+        }
+
+        if (!editable) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.leaderboard_locked_hint),
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+            )
         }
 
         Spacer(Modifier.height(16.dp))
@@ -414,6 +432,7 @@ private fun BoardDetailScreen(
                         rank = index + 1,
                         entry = entry,
                         isLast = index == entries.lastIndex,
+                        canDelete = editable,
                         onDelete = { deleteEntryTarget = entry },
                     )
                 }
@@ -538,6 +557,7 @@ private fun EntryRow(
     rank: Int,
     entry: LeaderboardEntry,
     isLast: Boolean,
+    canDelete: Boolean,
     onDelete: () -> Unit,
 ) {
     val colors = LocalEchoColors.current
@@ -581,16 +601,18 @@ private fun EntryRow(
                 fontSize = 16.sp,
                 fontFamily = FontFamily.Monospace,
             )
-            Spacer(Modifier.size(6.dp))
-            val deleteLabel = stringResource(R.string.leaderboard_entry_delete)
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .semantics { contentDescription = deleteLabel }
-                    .clickable(onClick = onDelete),
-                contentAlignment = Alignment.Center,
-            ) {
-                GlyphIcon(glyph = Glyph.TRASH, size = 16.dp, tint = colors.textSecondary)
+            if (canDelete) {
+                Spacer(Modifier.size(6.dp))
+                val deleteLabel = stringResource(R.string.leaderboard_entry_delete)
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .semantics { contentDescription = deleteLabel }
+                        .clickable(onClick = onDelete),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    GlyphIcon(glyph = Glyph.TRASH, size = 16.dp, tint = colors.textSecondary)
+                }
             }
         }
     }
