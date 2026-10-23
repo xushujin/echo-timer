@@ -12,6 +12,8 @@ import com.echotimer.core.leaderboard.LeaderboardEntry
 import com.echotimer.core.leaderboard.LeaderboardRules
 import com.echotimer.core.leaderboard.SubmitResult
 import com.echotimer.core.settings.SettingsRepository
+import com.echotimer.core.sync.LeaderboardSyncManager
+import com.echotimer.core.sync.SyncResult
 import com.echotimer.core.time.AnnouncementScheduler
 import com.echotimer.core.time.ElapsedFormatter
 import com.echotimer.core.time.MonotonicClock
@@ -52,10 +54,17 @@ data class ChallengeState(
  * 挑战用的是独立的 [StopwatchEngine]（与计时页互不干扰），且不提供计次功能；
  * 结束后调用仓库提交成绩，由仓库按"只有更大才更新"的规则落库。
  */
+/** 同步面板的状态：是否在同步 + 上一次的结果（界面自己翻译成文案）。 */
+data class SyncUiState(
+    val running: Boolean = false,
+    val result: SyncResult? = null,
+)
+
 class LeaderboardViewModel(
     private val repository: LeaderboardRepository,
     private val settingsRepository: SettingsRepository,
     private val announcer: Announcer,
+    private val syncManager: LeaderboardSyncManager,
     clock: MonotonicClock,
 ) : ViewModel() {
 
@@ -67,6 +76,9 @@ class LeaderboardViewModel(
 
     private val _challenge = MutableStateFlow<ChallengeState?>(null)
     val challenge: StateFlow<ChallengeState?> = _challenge.asStateFlow()
+
+    private val _syncState = MutableStateFlow(SyncUiState())
+    val syncState: StateFlow<SyncUiState> = _syncState.asStateFlow()
 
     private val engine = StopwatchEngine(clock)
     private val scheduler = AnnouncementScheduler()
@@ -96,6 +108,16 @@ class LeaderboardViewModel(
     }
 
     suspend fun createBoard(rawName: String): CreateBoardResult = repository.createBoard(rawName)
+
+    /** 立即同步：读远端 → 双向合并 → 写远端 → 写回本地。 */
+    fun syncNow() {
+        if (_syncState.value.running) return
+        viewModelScope.launch {
+            _syncState.value = SyncUiState(running = true, result = _syncState.value.result)
+            val result = syncManager.sync()
+            _syncState.value = SyncUiState(running = false, result = result)
+        }
+    }
 
     fun deleteEntry(entryId: Long) {
         viewModelScope.launch { repository.deleteEntry(entryId) }
@@ -221,6 +243,7 @@ class LeaderboardViewModel(
                     repository = app.container.leaderboardRepository,
                     settingsRepository = app.container.settingsRepository,
                     announcer = app.container.announcer,
+                    syncManager = app.container.syncManager,
                     clock = app.container.clock,
                 )
             }

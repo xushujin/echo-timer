@@ -9,6 +9,9 @@ import com.echotimer.core.leaderboard.LeaderboardEntry
 import com.echotimer.core.leaderboard.LeaderboardRules
 import com.echotimer.core.leaderboard.ScoreOutcome
 import com.echotimer.core.leaderboard.SubmitResult
+import com.echotimer.core.sync.SyncBoard
+import com.echotimer.core.sync.SyncEntry
+import com.echotimer.core.sync.SyncSnapshot
 import com.echotimer.data.db.EchoDb
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -137,6 +140,118 @@ class LeaderboardRepository(
                 previousBestMs = previousBestMs,
             )
         }
+
+    /** 导出全量数据（同步用）：榜单按名字、成绩按「榜单名 + 玩家名」组织。 */
+    suspend fun snapshot(): SyncSnapshot = withContext(io) {
+        val boards = ArrayList<SyncBoard>()
+        db.readableDatabase.rawQuery(
+            "SELECT name, created_at FROM leaderboards ORDER BY id",
+            null,
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                boards.add(SyncBoard(name = cursor.getString(0), createdAt = cursor.getLong(1)))
+            }
+        }
+        val entries = ArrayList<SyncEntry>()
+        val sql = """
+            SELECT b.name, e.player, e.best_ms, e.updated_at
+            FROM leaderboard_entries e
+            JOIN leaderboards b ON b.id = e.board_id
+            ORDER BY b.id, e.best_ms DESC
+        """.trimIndent()
+        db.readableDatabase.rawQuery(sql, null).use { cursor ->
+            while (cursor.moveToNext()) {
+                entries.add(
+                    SyncEntry(
+                        board = cursor.getString(0),
+                        player = cursor.getString(1),
+                        bestMs = cursor.getLong(2),
+                        updatedAt = cursor.getLong(3),
+                    ),
+                )
+            }
+        }
+        SyncSnapshot(boards = boards, entries = entries, updatedAt = System.currentTimeMillis())
+    }
+
+    /**
+     * 把同步结果写回本地：缺的榜单/成绩补上，成绩只增不减。
+     * 与仓库里的 [submit] 保持同一套语义，避免"同步"绕过"只有更大才更新"的规则。
+     */
+    suspend fun mergeRemote(snapshot: SyncSnapshot) = withContext(io) {
+        val database = db.writableDatabase
+        database.beginTransaction()
+        try {
+            val boardIds = HashMap<String, Long>()
+            database.rawQuery("SELECT id, name FROM leaderboards", null).use { cursor ->
+                while (cursor.moveToNext()) {
+                    boardIds[cursor.getString(1).trim().lowercase()] = cursor.getLong(0)
+                }
+            }
+
+            for (board in snapshot.boards) {
+                val key = board.name.trim().lowercase()
+                if (key.isEmpty() || boardIds.containsKey(key)) continue
+                val id = try {
+                    database.insertOrThrow(
+                        TABLE_BOARDS,
+                        null,
+                        ContentValues().apply {
+                            put(COL_NAME, board.name.trim())
+                            put(COL_CREATED_AT, if (board.createdAt > 0) board.createdAt else System.currentTimeMillis())
+                        },
+                    )
+                } catch (_: SQLiteConstraintException) {
+                    queryBoardId(database, board.name) ?: continue
+                }
+                boardIds[key] = id
+            }
+
+            for (entry in snapshot.entries) {
+                val boardId = boardIds[entry.board.trim().lowercase()] ?: continue
+                val existing = queryBestMs(database, boardId, entry.player)
+                when {
+                    existing == null -> try {
+                        database.insertOrThrow(
+                            TABLE_ENTRIES,
+                            null,
+                            ContentValues().apply {
+                                put(COL_BOARD_ID, boardId)
+                                put(COL_PLAYER, entry.player)
+                                put(COL_BEST_MS, entry.bestMs)
+                                put(COL_UPDATED_AT, entry.updatedAt)
+                            },
+                        )
+                    } catch (_: SQLiteConstraintException) {
+                        // 并发写入已经插入了同一条，忽略即可
+                    }
+
+                    entry.bestMs > existing -> database.update(
+                        TABLE_ENTRIES,
+                        ContentValues().apply {
+                            put(COL_BEST_MS, entry.bestMs)
+                            put(COL_UPDATED_AT, entry.updatedAt)
+                        },
+                        "$COL_BOARD_ID = ? AND $COL_PLAYER = ?",
+                        arrayOf(boardId.toString(), entry.player),
+                    )
+
+                    else -> Unit
+                }
+            }
+            database.setTransactionSuccessful()
+        } finally {
+            database.endTransaction()
+        }
+        _boards.value = queryBoards()
+        selectedBoardId?.let { _entries.value = queryEntries(it) }
+    }
+
+    private fun queryBoardId(database: SQLiteDatabase, name: String): Long? {
+        database.rawQuery("SELECT id FROM leaderboards WHERE name = ?", arrayOf(name.trim())).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.getLong(0) else null
+        }
+    }
 
     private fun queryBoards(): List<Leaderboard> {
         val sql = """

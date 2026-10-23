@@ -7,6 +7,7 @@ import com.echotimer.core.time.MonotonicClock
 import com.echotimer.core.voice.Announcer
 import com.echotimer.core.voice.TtsAnnouncer
 import com.echotimer.core.voice.VoiceSourceFactory
+import com.echotimer.core.sync.LeaderboardSyncManager
 import com.echotimer.core.voice.offline.OfflineVoiceStore
 import com.echotimer.data.HistoryRepository
 import com.echotimer.data.LeaderboardRepository
@@ -30,6 +31,11 @@ class AppContainer(context: Context) {
     val historyRepository: HistoryRepository = HistoryRepository(database)
 
     val leaderboardRepository: LeaderboardRepository = LeaderboardRepository(database)
+
+    /** 榜单同步：本地 ↔ GitHub 仓库里的 NDJSON 文件。 */
+    val syncManager: LeaderboardSyncManager by lazy {
+        LeaderboardSyncManager(settingsRepository, leaderboardRepository)
+    }
 
     /** 单调时钟：SystemClock.elapsedRealtime 不受系统时间调整影响。 */
     val clock: MonotonicClock = MonotonicClock { SystemClock.elapsedRealtime() }

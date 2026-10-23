@@ -179,6 +179,8 @@ fun NeumorphicTextField(
     placeholder: String? = null,
     singleLine: Boolean = true,
     imeAction: ImeAction = ImeAction.Next,
+    /** 令牌这类敏感内容用圆点显示。 */
+    secret: Boolean = false,
 ) {
     val colors = LocalEchoColors.current
     Column(modifier = modifier.fillMaxWidth()) {
@@ -208,6 +210,11 @@ fun NeumorphicTextField(
                 ),
                 cursorBrush = SolidColor(colors.accent),
                 keyboardOptions = KeyboardOptions(imeAction = imeAction),
+                visualTransformation = if (secret) {
+                    androidx.compose.ui.text.input.PasswordVisualTransformation()
+                } else {
+                    androidx.compose.ui.text.input.VisualTransformation.None
+                },
                 modifier = Modifier.fillMaxWidth(),
                 decorationBox = { inner ->
                     Box(contentAlignment = Alignment.CenterStart) {

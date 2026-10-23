@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echotimer.R
@@ -38,10 +39,14 @@ import com.echotimer.core.settings.AppSettings
 import com.echotimer.core.settings.ThemeMode
 import com.echotimer.core.theme.PaletteSpec
 import com.echotimer.core.settings.VoiceEngine
+import com.echotimer.core.sync.SyncResult
 import com.echotimer.core.theme.Palettes
 import com.echotimer.core.voice.VoiceCommand
 import com.echotimer.ui.components.NeumorphicChip
+import com.echotimer.ui.LeaderboardViewModel
+import com.echotimer.ui.SyncUiState
 import com.echotimer.ui.components.NeumorphicSegmented
+import com.echotimer.ui.components.NeumorphicTextField
 import com.echotimer.ui.components.VoiceSetupDialog
 import com.echotimer.ui.components.NeumorphicToggle
 import com.echotimer.ui.components.SectionTitle
@@ -65,6 +70,8 @@ fun SettingsScreen(
     onMicPermissionResult: (Boolean) -> Unit,
     offlineTemplates: Int,
     onOpenVoiceTraining: () -> Unit,
+    syncState: SyncUiState,
+    onSync: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalEchoColors.current
@@ -361,6 +368,95 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(14.dp))
 
+        // ---------------- 数据同步 ----------------
+        NeumorphicCard(modifier = Modifier.fillMaxWidth()) {
+            SectionTitle(stringResource(R.string.settings_section_sync))
+            Spacer(Modifier.height(14.dp))
+            SettingRow(
+                title = stringResource(R.string.settings_sync_enabled),
+                subtitle = stringResource(R.string.settings_sync_enabled_sub),
+                control = {
+                    NeumorphicToggle(
+                        checked = settings.syncEnabled,
+                        onCheckedChange = { enabled ->
+                            onUpdate(settings.copy(syncEnabled = enabled))
+                        },
+                    )
+                },
+            )
+            if (settings.syncEnabled) {
+                Spacer(Modifier.height(14.dp))
+                NeumorphicTextField(
+                    value = settings.syncRepo,
+                    onValueChange = { onUpdate(settings.copy(syncRepo = it)) },
+                    label = stringResource(R.string.settings_sync_repo),
+                    placeholder = "owner/repo",
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        NeumorphicTextField(
+                            value = settings.syncBranch,
+                            onValueChange = { onUpdate(settings.copy(syncBranch = it)) },
+                            label = stringResource(R.string.settings_sync_branch),
+                            placeholder = "main",
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1.6f)) {
+                        NeumorphicTextField(
+                            value = settings.syncPath,
+                            onValueChange = { onUpdate(settings.copy(syncPath = it)) },
+                            label = stringResource(R.string.settings_sync_path),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                NeumorphicTextField(
+                    value = settings.syncToken,
+                    onValueChange = { onUpdate(settings.copy(syncToken = it)) },
+                    label = stringResource(R.string.settings_sync_token),
+                    secret = true,
+                    imeAction = ImeAction.Done,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.settings_sync_token_hint),
+                    color = colors.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                NeumorphicChip(
+                    label = stringResource(
+                        if (syncState.running) R.string.settings_sync_running else R.string.settings_sync_now,
+                    ),
+                    selected = false,
+                    enabled = !syncState.running,
+                    onClick = onSync,
+                )
+                val status = syncState.result
+                if (status != null) {
+                    Spacer(Modifier.height(10.dp))
+                    val rendered = syncStatus(status)
+                    Text(
+                        text = rendered.text,
+                        color = if (rendered.ok) colors.accent else colors.danger,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_sync_note),
+                    color = colors.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
         // ---------------- 其他 ----------------
         NeumorphicCard(modifier = Modifier.fillMaxWidth()) {
             SectionTitle(stringResource(R.string.settings_section_other))
@@ -477,3 +573,29 @@ private fun PaletteSwatch(palette: PaletteSpec, selected: Boolean, onClick: () -
         )
     }
 }
+
+/** 同步结果文案：成功用强调色，失败用危险色，并尽量说清是哪一步。 */
+@Composable
+private fun syncStatus(result: SyncResult): SyncStatusText = when (result) {
+    is SyncResult.Success -> when {
+        result.boards == 0 && result.entries == 0 -> SyncStatusText(
+            stringResource(R.string.sync_result_empty),
+            ok = true,
+        )
+
+        else -> {
+            val head = stringResource(R.string.sync_result_ok, result.boards, result.entries)
+            val detail = if (result.pushed) {
+                stringResource(R.string.sync_result_pushed, result.addedEntries, result.improvedEntries)
+            } else {
+                stringResource(R.string.sync_result_no_change)
+            }
+            SyncStatusText("$head\n$detail", ok = true)
+        }
+    }
+
+    is SyncResult.NotConfigured -> SyncStatusText(result.message, ok = false)
+    is SyncResult.Failed -> SyncStatusText(result.message, ok = false)
+}
+
+private data class SyncStatusText(val text: String, val ok: Boolean)

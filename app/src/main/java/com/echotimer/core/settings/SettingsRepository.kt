@@ -64,6 +64,11 @@ class SettingsRepository(context: Context) {
                 KEY_LEADERBOARD_EDITABLE,
                 defaults.leaderboardEditable,
             ),
+            syncEnabled = prefs.getBoolean(KEY_SYNC_ENABLED, defaults.syncEnabled),
+            syncRepo = prefs.getString(KEY_SYNC_REPO, defaults.syncRepo) ?: defaults.syncRepo,
+            syncBranch = prefs.getString(KEY_SYNC_BRANCH, defaults.syncBranch) ?: defaults.syncBranch,
+            syncPath = prefs.getString(KEY_SYNC_PATH, defaults.syncPath) ?: defaults.syncPath,
+            syncToken = prefs.getString(KEY_SYNC_TOKEN, defaults.syncToken) ?: defaults.syncToken,
         ).sanitized()
     }
 
@@ -81,6 +86,11 @@ class SettingsRepository(context: Context) {
             .putString(KEY_VOICE_ENGINE, SettingsCodec.encodeVoiceEngine(settings.voiceEngine))
             .putString(KEY_OFFLINE_SENSITIVITY, SettingsCodec.encodeSensitivity(settings.offlineSensitivity))
             .putBoolean(KEY_LEADERBOARD_EDITABLE, settings.leaderboardEditable)
+            .putBoolean(KEY_SYNC_ENABLED, settings.syncEnabled)
+            .putString(KEY_SYNC_REPO, settings.syncRepo)
+            .putString(KEY_SYNC_BRANCH, settings.syncBranch)
+            .putString(KEY_SYNC_PATH, settings.syncPath)
+            .putString(KEY_SYNC_TOKEN, settings.syncToken)
             .apply()
     }
 
@@ -98,5 +108,10 @@ class SettingsRepository(context: Context) {
         const val KEY_VOICE_ENGINE = "voice_engine"
         const val KEY_OFFLINE_SENSITIVITY = "offline_sensitivity"
         const val KEY_LEADERBOARD_EDITABLE = "leaderboard_editable"
+        const val KEY_SYNC_ENABLED = "sync_enabled"
+        const val KEY_SYNC_REPO = "sync_repo"
+        const val KEY_SYNC_BRANCH = "sync_branch"
+        const val KEY_SYNC_PATH = "sync_path"
+        const val KEY_SYNC_TOKEN = "sync_token"
     }
 }

@@ -66,6 +66,15 @@ data class AppSettings(
      * 默认关闭 = 只读：成绩只能通过"开始挑战"产生，防止误删或手动改分。
      */
     val leaderboardEditable: Boolean = false,
+    /** 是否启用「同步到 GitHub 仓库」（可选功能，默认关闭）。 */
+    val syncEnabled: Boolean = false,
+    /** 仓库，形如 owner/name；也接受粘贴完整地址。 */
+    val syncRepo: String = "",
+    val syncBranch: String = "main",
+    /** 仓库里的文件路径（NDJSON）。 */
+    val syncPath: String = DEFAULT_SYNC_PATH,
+    /** 访问令牌：只存在本机，不会写进同步文件。 */
+    val syncToken: String = "",
 ) {
 
     /** 归一化：非法值回落默认，保证从磁盘读到的脏数据不会把界面带崩。 */
@@ -74,6 +83,8 @@ data class AppSettings(
         announcementIntervalSeconds = announcementIntervalSeconds
             .coerceIn(MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS),
         recognitionLanguage = recognitionLanguage.takeIf { it.isNotBlank() } ?: "zh-CN",
+        syncBranch = syncBranch.trim().ifBlank { "main" },
+        syncPath = syncPath.trim().trim('/').ifBlank { DEFAULT_SYNC_PATH },
     )
 
     companion object {
@@ -82,6 +93,9 @@ data class AppSettings(
 
         /** 默认 5 秒一次：比每秒播报更不吵，也符合"按间隔报时"的直觉。 */
         const val DEFAULT_INTERVAL_SECONDS = 5
+
+        /** 同步文件默认路径：和 docs/index.html 里读的路径保持一致。 */
+        const val DEFAULT_SYNC_PATH = "echotimer/leaderboard.ndjson"
 
         /** 设置界面提供的可选间隔。 */
         val SELECTABLE_INTERVALS: List<Int> = listOf(1, 2, 5, 10, 15, 30, 60, 120, 300, 600)

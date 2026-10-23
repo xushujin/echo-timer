@@ -90,6 +90,7 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
     val boardEntries by leaderboardViewModel.entries.collectAsStateWithLifecycle()
     val boardRoute by leaderboardViewModel.route.collectAsStateWithLifecycle()
     val challenge by leaderboardViewModel.challenge.collectAsStateWithLifecycle()
+    val syncState by leaderboardViewModel.syncState.collectAsStateWithLifecycle()
 
     val view = LocalView.current
     SideEffect {
@@ -161,6 +162,8 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
                     onTestSpeak = timerViewModel::testSpeak,
                     onMicPermissionResult = timerViewModel::onMicPermissionResult,
                     offlineTemplates = timerState.offlineTemplates,
+                    syncState = syncState,
+                    onSync = leaderboardViewModel::syncNow,
                     onOpenVoiceTraining = {
                         timerViewModel.setVoiceTrainingActive(true)
                         showVoiceTraining = true

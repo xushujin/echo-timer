@@ -5,7 +5,7 @@
 一个不依赖任何第三方 UI 库 / 依赖注入框架的秒表应用：计时过程中按你设定的时间点用语音报时，
 并且可以用「开始」「结束」这类口令直接控制计时。计时结果以多组记录的形式保存在本机。
 
-当前版本：1.2.1
+当前版本：1.3.0
 
 ---
 
@@ -39,6 +39,8 @@
 | 多组历史记录 | 每次结束自动入库（可关闭），带计次明细（最后一次在最前），支持重命名、删除 |
 | 天梯榜 | 自定义多个榜单（名称唯一），输入或选择姓名后开始不计次的挑战（**同样按设定间隔报时**）；支持**手工录入**成绩；只有超过原记录才更新，榜单按秒数降序 |
 | 榜单只读 | 设置里「允许修改榜单」默认关闭：关闭时不能手工录入、不能删除成绩或榜单，成绩只能靠真实挑战产生（新建榜单与挑战不受影响） |
+| 数据同步（可选） | 把榜单写到自己的 GitHub 仓库：读远端 → 双向合并 → 写回，成绩只增不减，内容没变化不产生提交 |
+| 网页展示 | 仓库里的 `docs/index.html` 直接读同步文件渲染榜单，可挂 GitHub Pages 或本地打开 |
 | 榜单分享 | 把整个榜单导出成一张 PNG（第一名皇冠、最后一名整行标红，配色跟随当前主题），可分享到任意应用或存进相册 |
 | 拟态界面 | 3 套配色（石墨 / 暖沙 / 雾青）× 明暗两态，全局切换立即生效 |
 | 关于页 | 应用名、版本号、技术栈、支持范围、权限说明 |
@@ -56,7 +58,7 @@
 | 数据 | 手写 `SQLiteOpenHelper` + 显式版本迁移（未使用 Room） |
 | 语音合成 | 系统 `TextToSpeech` |
 | 语音识别 | 系统 `SpeechRecognizer`（`RecognitionService`），或自研离线口令匹配 |
-| 测试 | JUnit4（119 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
+| 测试 | JUnit4（144 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
 
 版本号在构建脚本里只有一处定义（`app/build.gradle.kts` 的 `appVersionName` / `appVersionCode`），
 关于页通过 `BuildConfig` 读取；`tools/check_consistency.py` 会核对构建脚本、README 与关于页三者是否一致。
@@ -79,6 +81,7 @@
 | 主题系统 | 自研 `Palettes` + `CompositionLocal` | 3 套配色 × 明暗，单一入口全局生效 |
 | 图标 | 自研 `GlyphIcon` | Canvas 手绘，不引图标库 |
 | 榜单分享图 | 自研 `LeaderboardPoster` | 用 `android.graphics` 按数据排版，不依赖截屏 API，长榜单也能整张导出 |
+| 榜单同步 | 自研 `SyncCodec` / `SyncMerger` | NDJSON 编解码与合并策略手写；只用 `HttpsURLConnection` 调 GitHub Contents API，不引 git 库 |
 | 数据层 | 自研 `EchoDb` + `Migrations` | 显式迁移，缺失迁移直接抛异常 |
 | 语音合成 | 系统 `TextToSpeech` | 平台能力；调度与文本生成是自研的 |
 | 语音识别 | 系统 `SpeechRecognizer` | 平台能力，仅作"声音 → 文本"输入；文本如何变成动作是自研的 |
@@ -97,6 +100,7 @@ app/src/main/java/com/echotimer/
 ├── core/
 │   ├── leaderboard/             # 天梯榜模型与规则（纯函数）
 │   ├── share/                   # 分享图版面常量与文件名规则（纯函数）
+│   ├── sync/                    # 榜单同步：NDJSON 编解码、双向合并、GitHub Contents API
 │   ├── settings/                # 设置模型、序列化、唯一读写入口
 │   ├── theme/                   # 配色规格（纯数据，可单测对比度）
 │   ├── time/                    # 秒表内核、播报调度、时间格式化
@@ -118,7 +122,8 @@ app/src/main/java/com/echotimer/
     ├── share/                   # 榜单分享图渲染（android.graphics）+ 分享/存相册
     ├── screens/                 # 计时 / 记录 / 天梯 / 挑战 / 设置 / 关于
     └── theme/                   # Compose 主题适配
-app/src/test/java/com/echotimer/ # 119 个 JVM 单测
+app/src/test/java/com/echotimer/ # 144 个 JVM 单测
+docs/index.html                  # 读同步文件渲染榜单的静态页（可挂 GitHub Pages）
 tools/
 ├── verify_migrations.py         # 用真实 sqlite3 验证迁移
 └── check_consistency.py         # 文档 / 构建脚本 / 代码一致性检查
@@ -342,6 +347,55 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
   关闭时：手工录入、删除成绩、删除榜单全部隐藏，榜单详情页显示一行锁定说明；
   新建榜单与「开始挑战」仍然可用——也就是说成绩只能靠真的跑一次来产生，防止手改分数或误删。
 
+## 数据同步与网页（可选）
+
+默认**关闭**，不配置就完全本地运行。开启后把榜单写进你自己的 GitHub 仓库，
+再用仓库里的 `docs/index.html` 展示。
+
+### 配置
+
+设置 →「数据同步」：
+
+| 字段 | 说明 |
+| --- | --- |
+| 仓库 | `owner/name`，也接受粘贴 `https://github.com/owner/name` 或 SSH 地址 |
+| 分支 | 默认 `main` |
+| 文件路径 | 默认 `echotimer/leaderboard.ndjson`（与网页默认值一致） |
+| 访问令牌 | classic token 勾 `repo`；fine-grained token 需要该仓库的 **Contents: Read and write** |
+
+令牌只保存在本机 SharedPreferences，**不会**写进同步文件；仓库若是公开的，成绩也会公开。
+
+### 同步规则
+
+每次点「立即同步」都会：读远端 → 与本地双向合并 → 写回仓库 → 写回本地数据库。
+
+- 身份：榜单按**名称**、成绩按**榜单名 + 玩家名**匹配（名称不区分英文大小写）；
+- 成绩**只增不减**：两边取更好的那次，因此删除的记录下次同步会从仓库回来；
+- **没有变化就不提交**（否则每点一次同步都会多一个空 commit）；
+- 并发写冲突（远端 sha 变了）会重新读取合并再试一次。
+
+### 文件格式
+
+NDJSON，每行一个扁平 JSON 对象：
+
+```json
+{"type":"meta","version":1,"updatedAt":1700000000000}
+{"type":"board","name":"单杠悬垂","createdAt":1700000000000}
+{"type":"entry","board":"单杠悬垂","player":"张三","bestMs":63000,"updatedAt":1700000000000}
+```
+
+### 网页
+
+`docs/index.html` 是单文件静态页（无任何外部依赖），读取
+`https://raw.githubusercontent.com/{repo}/{branch}/{path}` 后渲染：
+第一名皇冠、最后一名整行标红、时间格式与 App 一致。
+
+- 直接用浏览器打开也可以（raw.githubusercontent 允许跨域）；
+- 想在线访问：仓库 Settings → Pages → Source 选 `Deploy from a branch`，目录选 `/docs`，
+  之后访问 `https://{owner}.github.io/{repo}/`；
+- 换仓库/分支不用改代码，用查询参数即可：
+  `?repo=owner/name&branch=main&path=echotimer/leaderboard.ndjson`。
+
 ## 语音指令规则
 
 有两种引擎，设置页可切换（默认「自动」）：
@@ -432,7 +486,7 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
   - `OldTargetApi`：CI 镜像会随平台更新预装更新的 Android platform，而 lint 在"未使用最新 API"时报错，
     会让发版被环境升级卡住。这里忽略该检查（项目当前 targetSdk = 36），改版时按需手动检查目标 API。
 
-### 单元测试（119 个，全部通过）
+### 单元测试（144 个，全部通过）
 
 | 测试类 | 用例数 | 覆盖点 |
 | --- | --- | --- |
@@ -456,6 +510,10 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
 | `VoiceEngineResolverTest` | 5 | 自动/系统/离线三种偏好的完整组合 |
 | `VoiceSettingsCodecTest` | 6 | 引擎与灵敏度往返、脏数据回落、默认值、sanitize 保留 |
 | `LeaderboardPermissionTest` | 2 | 榜单默认只读、sanitize 保留修改权限 |
+| `JsonTest` | 6 | 转义往返、字符串/数字/布尔、跳过嵌套对象、非法输入、\u 转义 |
+| `SyncCodecTest` | 6 | NDJSON 往返、中文与引号、坏行跳过、未知类型、空输入、脏记录过滤 |
+| `SyncMergerTest` | 7 | 双向合并、取更好成绩、名称大小写、孤儿成绩补榜单、幂等、内容等价、非法记录 |
+| `SyncConfigTest` | 6 | 仓库地址归一化（URL / .git / SSH）、非法输入、默认分支与路径、缺项提示 |
 
 ### 真实引擎验证（迁移）
 
@@ -512,7 +570,7 @@ PASS  删除榜单时级联删除成绩
 **已验证**
 
 - 编译（debug / release）、Kotlin 零警告、lint 零问题
-- 119 个单元测试全部通过
+- 144 个单元测试全部通过
 - 真实 `sqlite3` 上的迁移与数据保留、级联删除
 - release APK 构建、签名、清单与权限核对（两条签名通道 + CI 缺签名保护）
 
@@ -548,6 +606,16 @@ PASS  删除榜单时级联删除成绩
 ---
 
 ## 变更记录
+
+### v1.3.0
+
+- 新增**可选的数据同步**：把榜单写到自己的 GitHub 仓库（Contents API），
+  读远端 → 双向合并 → 写回仓库与本地；成绩只增不减、内容没变化不产生提交、sha 冲突自动重试。
+  令牌只存本机，同步文件里不含令牌。
+- 新增**网页展示**：`docs/index.html` 单文件静态页，直接读仓库里的 NDJSON 渲染榜单
+  （第一名皇冠、最后一名标红），可挂 GitHub Pages 或本地打开。
+- 同步文件格式为 NDJSON，编解码与合并策略全部自研并有单测（新增 25 个，总数 119 → 144）。
+- 版本号 1.3.0（versionCode 7）。
 
 ### v1.2.1
 
