@@ -69,6 +69,7 @@ class SettingsRepository(context: Context) {
             syncBranch = prefs.getString(KEY_SYNC_BRANCH, defaults.syncBranch) ?: defaults.syncBranch,
             syncPath = prefs.getString(KEY_SYNC_PATH, defaults.syncPath) ?: defaults.syncPath,
             syncToken = prefs.getString(KEY_SYNC_TOKEN, defaults.syncToken) ?: defaults.syncToken,
+            syncForceLocal = prefs.getBoolean(KEY_SYNC_FORCE_LOCAL, defaults.syncForceLocal),
         ).sanitized()
     }
 
@@ -91,6 +92,7 @@ class SettingsRepository(context: Context) {
             .putString(KEY_SYNC_BRANCH, settings.syncBranch)
             .putString(KEY_SYNC_PATH, settings.syncPath)
             .putString(KEY_SYNC_TOKEN, settings.syncToken)
+            .putBoolean(KEY_SYNC_FORCE_LOCAL, settings.syncForceLocal)
             .apply()
     }
 
@@ -113,5 +115,6 @@ class SettingsRepository(context: Context) {
         const val KEY_SYNC_BRANCH = "sync_branch"
         const val KEY_SYNC_PATH = "sync_path"
         const val KEY_SYNC_TOKEN = "sync_token"
+        const val KEY_SYNC_FORCE_LOCAL = "sync_force_local"
     }
 }

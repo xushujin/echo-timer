@@ -18,6 +18,8 @@ sealed interface SyncResult {
         /** 仓库里的成绩比本地更好、被采纳的条数。 */
         val improvedEntries: Int,
         val fileUrl: String,
+        /** 本次是「以本地为准」的覆盖模式（没有做合并）。 */
+        val forced: Boolean = false,
     ) : SyncResult
 
     data class NotConfigured(val message: String) : SyncResult
@@ -49,6 +51,9 @@ class LeaderboardSyncManager(
             token = settings.syncToken,
         )
         config.problem()?.let { return@withContext SyncResult.NotConfigured(it) }
+
+        // 「以本地为准」：不做合并，直接把本地写上去（仓库历史里仍可找回旧版本）。
+        if (settings.syncForceLocal) return@withContext overwriteRemote(config)
 
         val local = repository.snapshot()
         var remoteFile = client.fetch(config)
@@ -115,6 +120,63 @@ class LeaderboardSyncManager(
             improvedEntries = merged.improvedEntries,
             fileUrl = fileUrl(config),
         )
+    }
+
+    /**
+     * 覆盖模式：本地 → 仓库，单向写入。
+     *
+     * 两条保护：本地为空时拒绝（否则等于清空仓库）；内容与仓库一致时不提交。
+     */
+    private suspend fun overwriteRemote(config: SyncConfig): SyncResult {
+        val local = repository.snapshot()
+        if (!SyncPolicy.canOverwrite(local)) {
+            return SyncResult.Failed("本地还没有数据，覆盖会把仓库清空，已取消")
+        }
+
+        val fetched = client.fetch(config)
+        val sha = when (fetched) {
+            is GitHubClient.FetchResult.Found -> fetched.sha
+            GitHubClient.FetchResult.Missing -> null
+            is GitHubClient.FetchResult.Error -> return SyncResult.Failed(fetched.message)
+        }
+
+        if (fetched is GitHubClient.FetchResult.Found &&
+            SyncMerger.sameData(local, SyncCodec.decode(fetched.content))
+        ) {
+            return SyncResult.Success(
+                pushed = false,
+                boards = local.boards.size,
+                entries = local.entries.size,
+                addedEntries = 0,
+                improvedEntries = 0,
+                fileUrl = fileUrl(config),
+                forced = true,
+            )
+        }
+
+        val content = SyncCodec.encode(local.copy(updatedAt = System.currentTimeMillis()))
+        var push = client.push(config, content, sha, "sync: 用本地覆盖仓库（EchoTimer）")
+        if (push == GitHubClient.PushResult.Conflict) {
+            val retry = client.fetch(config)
+            if (retry is GitHubClient.FetchResult.Error) return SyncResult.Failed(retry.message)
+            val retrySha = (retry as? GitHubClient.FetchResult.Found)?.sha
+            push = client.push(config, content, retrySha, "sync: 用本地覆盖仓库（EchoTimer）")
+        }
+
+        return when (push) {
+            GitHubClient.PushResult.Success -> SyncResult.Success(
+                pushed = true,
+                boards = local.boards.size,
+                entries = local.entries.size,
+                addedEntries = 0,
+                improvedEntries = 0,
+                fileUrl = fileUrl(config),
+                forced = true,
+            )
+
+            GitHubClient.PushResult.Conflict -> SyncResult.Failed("仓库内容刚被其它提交修改，请再同步一次")
+            is GitHubClient.PushResult.Error -> SyncResult.Failed(push.message)
+        }
     }
 
     private fun fileUrl(config: SyncConfig): String =

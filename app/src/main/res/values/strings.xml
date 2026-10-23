@@ -197,6 +197,8 @@
     <string name="settings_sync_path">文件路径</string>
     <string name="settings_sync_token">访问令牌（Token）</string>
     <string name="settings_sync_token_hint">经典令牌勾选 repo；Fine-grained 令牌需要该仓库的 Contents 读写权限。</string>
+    <string name="settings_sync_force_local">以本地为准（覆盖仓库）</string>
+    <string name="settings_sync_force_local_sub">开启后不再合并，直接用本地数据覆盖仓库文件；GitHub 提交历史里仍能找回旧版本。默认关闭。</string>
     <string name="settings_sync_now">立即同步</string>
     <string name="settings_sync_running">正在同步…</string>
     <string name="settings_sync_note">同步文件只包含榜单与成绩，不含令牌；仓库若是公开的，成绩也会公开。首次同步会自动创建文件。</string>
@@ -204,6 +206,8 @@
     <string name="sync_result_pushed">本次提交：新增 %1$d 条、刷新 %2$d 条</string>
     <string name="sync_result_no_change">没有变化，未产生新提交</string>
     <string name="sync_result_empty">本地和仓库都还没有数据</string>
+    <string name="sync_result_forced">已用本地覆盖仓库 · %1$d 个榜单 / %2$d 条成绩</string>
+    <string name="sync_result_forced_no_change">本地与仓库一致，未产生提交</string>
     <string name="settings_section_other">其他</string>
     <string name="settings_section_leaderboard">天梯榜</string>
     <string name="settings_leaderboard_editable">允许修改榜单</string>

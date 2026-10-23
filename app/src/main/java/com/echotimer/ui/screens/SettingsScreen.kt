@@ -426,6 +426,19 @@ fun SettingsScreen(
                     lineHeight = 16.sp,
                 )
                 Spacer(Modifier.height(12.dp))
+                SettingRow(
+                    title = stringResource(R.string.settings_sync_force_local),
+                    subtitle = stringResource(R.string.settings_sync_force_local_sub),
+                    control = {
+                        NeumorphicToggle(
+                            checked = settings.syncForceLocal,
+                            onCheckedChange = { force ->
+                                onUpdate(settings.copy(syncForceLocal = force))
+                            },
+                        )
+                    },
+                )
+                Spacer(Modifier.height(12.dp))
                 NeumorphicChip(
                     label = stringResource(
                         if (syncState.running) R.string.settings_sync_running else R.string.settings_sync_now,
@@ -582,6 +595,15 @@ private fun syncStatus(result: SyncResult): SyncStatusText = when (result) {
             stringResource(R.string.sync_result_empty),
             ok = true,
         )
+
+        result.forced -> {
+            val text = if (result.pushed) {
+                stringResource(R.string.sync_result_forced, result.boards, result.entries)
+            } else {
+                stringResource(R.string.sync_result_forced_no_change)
+            }
+            SyncStatusText(text, ok = true)
+        }
 
         else -> {
             val head = stringResource(R.string.sync_result_ok, result.boards, result.entries)

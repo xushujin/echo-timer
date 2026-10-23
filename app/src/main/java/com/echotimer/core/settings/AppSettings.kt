@@ -75,6 +75,11 @@ data class AppSettings(
     val syncPath: String = DEFAULT_SYNC_PATH,
     /** 访问令牌：只存在本机，不会写进同步文件。 */
     val syncToken: String = "",
+    /**
+     * 同步时以本地为准：跳过合并，直接用本地数据覆盖仓库文件。
+     * 默认关闭（默认是双向合并，谁的数据都不丢）。
+     */
+    val syncForceLocal: Boolean = false,
 ) {
 
     /** 归一化：非法值回落默认，保证从磁盘读到的脏数据不会把界面带崩。 */

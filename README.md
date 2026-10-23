@@ -5,7 +5,7 @@
 一个不依赖任何第三方 UI 库 / 依赖注入框架的秒表应用：计时过程中按你设定的时间点用语音报时，
 并且可以用「开始」「结束」这类口令直接控制计时。计时结果以多组记录的形式保存在本机。
 
-当前版本：1.3.0
+当前版本：1.4.0
 
 ---
 
@@ -58,7 +58,7 @@
 | 数据 | 手写 `SQLiteOpenHelper` + 显式版本迁移（未使用 Room） |
 | 语音合成 | 系统 `TextToSpeech` |
 | 语音识别 | 系统 `SpeechRecognizer`（`RecognitionService`），或自研离线口令匹配 |
-| 测试 | JUnit4（144 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
+| 测试 | JUnit4（148 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
 
 版本号在构建脚本里只有一处定义（`app/build.gradle.kts` 的 `appVersionName` / `appVersionCode`），
 关于页通过 `BuildConfig` 读取；`tools/check_consistency.py` 会核对构建脚本、README 与关于页三者是否一致。
@@ -122,7 +122,7 @@ app/src/main/java/com/echotimer/
     ├── share/                   # 榜单分享图渲染（android.graphics）+ 分享/存相册
     ├── screens/                 # 计时 / 记录 / 天梯 / 挑战 / 设置 / 关于
     └── theme/                   # Compose 主题适配
-app/src/test/java/com/echotimer/ # 144 个 JVM 单测
+app/src/test/java/com/echotimer/ # 148 个 JVM 单测
 docs/index.html                  # 读同步文件渲染榜单的静态页（可挂 GitHub Pages）
 tools/
 ├── verify_migrations.py         # 用真实 sqlite3 验证迁移
@@ -374,6 +374,15 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
 - **没有变化就不提交**（否则每点一次同步都会多一个空 commit）；
 - 并发写冲突（远端 sha 变了）会重新读取合并再试一次。
 
+### 覆盖模式（可选，默认关闭）
+
+「以本地为准（覆盖仓库）」打开后，同步**不再合并**，直接把本地数据整份写上去：
+
+- 用途：本地是权威数据，仓库只做展示/备份；或者想清掉仓库里多余的记录；
+- 保护一：本地一条数据都没有时**拒绝执行**（否则等于清空仓库）；
+- 保护二：本地与仓库内容一致时**不提交**；
+- 覆盖掉的旧内容仍留在 GitHub 的提交历史里，可以找回。
+
 ### 文件格式
 
 NDJSON，每行一个扁平 JSON 对象：
@@ -486,7 +495,7 @@ NDJSON，每行一个扁平 JSON 对象：
   - `OldTargetApi`：CI 镜像会随平台更新预装更新的 Android platform，而 lint 在"未使用最新 API"时报错，
     会让发版被环境升级卡住。这里忽略该检查（项目当前 targetSdk = 36），改版时按需手动检查目标 API。
 
-### 单元测试（144 个，全部通过）
+### 单元测试（148 个，全部通过）
 
 | 测试类 | 用例数 | 覆盖点 |
 | --- | --- | --- |
@@ -514,6 +523,7 @@ NDJSON，每行一个扁平 JSON 对象：
 | `SyncCodecTest` | 6 | NDJSON 往返、中文与引号、坏行跳过、未知类型、空输入、脏记录过滤 |
 | `SyncMergerTest` | 7 | 双向合并、取更好成绩、名称大小写、孤儿成绩补榜单、幂等、内容等价、非法记录 |
 | `SyncConfigTest` | 6 | 仓库地址归一化（URL / .git / SSH）、非法输入、默认分支与路径、缺项提示 |
+| `SyncPolicyTest` | 4 | 覆盖模式：空本地拒绝、有榜单/成绩可覆盖、默认关闭 |
 
 ### 真实引擎验证（迁移）
 
@@ -570,7 +580,7 @@ PASS  删除榜单时级联删除成绩
 **已验证**
 
 - 编译（debug / release）、Kotlin 零警告、lint 零问题
-- 144 个单元测试全部通过
+- 148 个单元测试全部通过
 - 真实 `sqlite3` 上的迁移与数据保留、级联删除
 - release APK 构建、签名、清单与权限核对（两条签名通道 + CI 缺签名保护）
 
@@ -606,6 +616,12 @@ PASS  删除榜单时级联删除成绩
 ---
 
 ## 变更记录
+
+### v1.4.0
+
+- 数据同步新增**「以本地为准（覆盖仓库）」**开关，默认关闭：打开后同步不再合并，
+  直接用本地数据覆盖仓库文件（旧内容仍在提交历史里）；本地为空时拒绝执行，内容一致时不提交。
+- 版本号 1.4.0（versionCode 8）。
 
 ### v1.3.0
 
