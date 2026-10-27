@@ -143,6 +143,8 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
                     route = boardRoute,
                     challenge = challenge,
                     editable = settings.leaderboardEditable,
+                    syncState = syncState,
+                    onSync = leaderboardViewModel::syncNow,
                     onCreateBoard = leaderboardViewModel::createBoard,
                     onDeleteBoard = leaderboardViewModel::deleteBoard,
                     onOpenBoard = leaderboardViewModel::openBoard,

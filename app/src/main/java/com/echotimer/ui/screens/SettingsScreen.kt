@@ -451,8 +451,13 @@ fun SettingsScreen(
                 if (status != null) {
                     Spacer(Modifier.height(10.dp))
                     val rendered = syncStatus(status)
+                    val statusText = if (syncState.auto) {
+                        stringResource(R.string.sync_status_auto, rendered.text)
+                    } else {
+                        rendered.text
+                    }
                     Text(
-                        text = rendered.text,
+                        text = statusText,
                         color = if (rendered.ok) colors.accent else colors.danger,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,

@@ -11,7 +11,9 @@ import com.echotimer.core.leaderboard.Leaderboard
 import com.echotimer.core.leaderboard.LeaderboardEntry
 import com.echotimer.core.leaderboard.LeaderboardRules
 import com.echotimer.core.leaderboard.SubmitResult
+import com.echotimer.core.leaderboard.ScoreOutcome
 import com.echotimer.core.settings.SettingsRepository
+import com.echotimer.core.sync.AutoSyncPolicy
 import com.echotimer.core.sync.LeaderboardSyncManager
 import com.echotimer.core.sync.SyncResult
 import com.echotimer.core.time.AnnouncementScheduler
@@ -26,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** 天梯 tab 内部的页面。 */
 sealed interface LeaderboardRoute {
@@ -58,6 +62,10 @@ data class ChallengeState(
 data class SyncUiState(
     val running: Boolean = false,
     val result: SyncResult? = null,
+    /** 这次是榜单变化后自动触发的。 */
+    val auto: Boolean = false,
+    /** 这次同步结束的时间戳，用于"已同步 · 12:34"。 */
+    val atMs: Long = 0L,
 )
 
 class LeaderboardViewModel(
@@ -78,6 +86,8 @@ class LeaderboardViewModel(
     val challenge: StateFlow<ChallengeState?> = _challenge.asStateFlow()
 
     private val _syncState = MutableStateFlow(SyncUiState())
+    private var autoSyncJob: Job? = null
+    private val syncMutex = Mutex()
     val syncState: StateFlow<SyncUiState> = _syncState.asStateFlow()
 
     private val engine = StopwatchEngine(clock)
@@ -107,20 +117,51 @@ class LeaderboardViewModel(
         _route.value = LeaderboardRoute.List
     }
 
-    suspend fun createBoard(rawName: String): CreateBoardResult = repository.createBoard(rawName)
+    suspend fun createBoard(rawName: String): CreateBoardResult {
+        val result = repository.createBoard(rawName)
+        if (result is CreateBoardResult.Created) scheduleAutoSync()
+        return result
+    }
 
-    /** 立即同步：读远端 → 双向合并 → 写远端 → 写回本地。 */
+    /** 立即同步（手动）：读远端 → 双向合并 → 写远端 → 写回本地。 */
     fun syncNow() {
-        if (_syncState.value.running) return
-        viewModelScope.launch {
-            _syncState.value = SyncUiState(running = true, result = _syncState.value.result)
+        autoSyncJob?.cancel()
+        viewModelScope.launch { runSync(auto = false) }
+    }
+
+    /**
+     * 榜单数据变了就安排一次自动同步。
+     *
+     * 用延迟窗口把连续操作合并成一次；已经有一次同步在跑时，新的请求会在
+     * [syncMutex] 上排队，不会丢。
+     */
+    private fun scheduleAutoSync() {
+        if (!AutoSyncPolicy.shouldSync(settingsRepository.settings.value)) return
+        autoSyncJob?.cancel()
+        autoSyncJob = viewModelScope.launch {
+            delay(AutoSyncPolicy.DEBOUNCE_MS)
+            runSync(auto = true)
+        }
+    }
+
+    private suspend fun runSync(auto: Boolean) {
+        syncMutex.withLock {
+            _syncState.value = _syncState.value.copy(running = true, auto = auto)
             val result = syncManager.sync()
-            _syncState.value = SyncUiState(running = false, result = result)
+            _syncState.value = SyncUiState(
+                running = false,
+                result = result,
+                auto = auto,
+                atMs = System.currentTimeMillis(),
+            )
         }
     }
 
     fun deleteEntry(entryId: Long) {
-        viewModelScope.launch { repository.deleteEntry(entryId) }
+        viewModelScope.launch {
+            repository.deleteEntry(entryId)
+            scheduleAutoSync()
+        }
     }
 
     fun deleteBoard(boardId: Long) {
@@ -129,6 +170,8 @@ class LeaderboardViewModel(
             if ((_route.value as? LeaderboardRoute.Board)?.boardId == boardId) {
                 _route.value = LeaderboardRoute.List
             }
+            scheduleAutoSync()
+            scheduleAutoSync()
         }
     }
 
@@ -155,8 +198,11 @@ class LeaderboardViewModel(
     }
 
     /** 手工录入成绩：走与挑战相同的"只有更大才更新"规则。 */
-    suspend fun submitManual(boardId: Long, player: String, elapsedMs: Long): SubmitResult =
-        repository.submit(boardId, player, elapsedMs)
+    suspend fun submitManual(boardId: Long, player: String, elapsedMs: Long): SubmitResult {
+        val result = repository.submit(boardId, player, elapsedMs)
+        if (result.outcome != ScoreOutcome.KEPT) scheduleAutoSync()
+        return result
+    }
 
     fun togglePause() {
         val state = _challenge.value ?: return
@@ -193,6 +239,8 @@ class LeaderboardViewModel(
         viewModelScope.launch {
             val result = repository.submit(state.boardId, state.player, total)
             _challenge.value = _challenge.value?.copy(submitting = false, result = result)
+            if (result.outcome != ScoreOutcome.KEPT) scheduleAutoSync()
+            if (result.outcome != ScoreOutcome.KEPT) scheduleAutoSync()
         }
     }
 

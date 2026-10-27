@@ -210,6 +210,11 @@
     <string name="sync_result_empty">本地和仓库都还没有数据</string>
     <string name="sync_result_forced">已用本地覆盖仓库 · %1$d 个榜单 / %2$d 条成绩</string>
     <string name="sync_result_forced_no_change">本地与仓库一致，未产生提交</string>
+    <string name="sync_status_auto">自动 · %1$s</string>
+    <string name="sync_line_running">正在同步…</string>
+    <string name="sync_line_done">已同步 · %1$s</string>
+    <string name="sync_line_failed">同步失败 · 点此重试</string>
+    <string name="sync_line_not_configured">同步配置不完整</string>
     <string name="settings_section_other">其他</string>
     <string name="settings_section_leaderboard">天梯榜</string>
     <string name="settings_leaderboard_editable">允许修改榜单</string>

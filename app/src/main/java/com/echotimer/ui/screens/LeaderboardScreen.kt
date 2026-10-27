@@ -55,11 +55,13 @@ import com.echotimer.core.share.PosterMark
 import com.echotimer.core.share.PosterRow
 import com.echotimer.core.share.PosterSpec
 import com.echotimer.core.share.ShareNaming
+import com.echotimer.core.sync.SyncResult
 import com.echotimer.core.time.ElapsedFormatter
 import com.echotimer.core.time.TimeInputParser
 import com.echotimer.ui.ChallengeState
 import com.echotimer.ui.DateFormats
 import com.echotimer.ui.LeaderboardRoute
+import com.echotimer.ui.SyncUiState
 import com.echotimer.ui.components.DialogBodyText
 import com.echotimer.ui.components.DialogErrorText
 import com.echotimer.ui.components.Glyph
@@ -92,6 +94,9 @@ fun LeaderboardTab(
     challenge: ChallengeState?,
     /** 是否允许改榜单数据（手工录入 / 删除）；关闭时只读。 */
     editable: Boolean,
+    /** 同步状态，显示在榜单列表顶部。 */
+    syncState: SyncUiState,
+    onSync: () -> Unit,
     onCreateBoard: suspend (String) -> CreateBoardResult,
     onDeleteBoard: (Long) -> Unit,
     onOpenBoard: (Long) -> Unit,
@@ -135,6 +140,8 @@ fun LeaderboardTab(
             boards = boards,
             onCreateBoard = onCreateBoard,
             onOpenBoard = onOpenBoard,
+            syncState = syncState,
+            onSync = onSync,
             modifier = modifier,
         )
     }
@@ -145,6 +152,8 @@ private fun BoardListScreen(
     boards: List<Leaderboard>,
     onCreateBoard: suspend (String) -> CreateBoardResult,
     onOpenBoard: (Long) -> Unit,
+    syncState: SyncUiState,
+    onSync: () -> Unit,
     modifier: Modifier,
 ) {
     val colors = LocalEchoColors.current
@@ -173,6 +182,7 @@ private fun BoardListScreen(
                 )
             }
         }
+        SyncStatusLine(state = syncState, onRetry = onSync)
         Spacer(Modifier.height(14.dp))
         NeumorphicChip(
             label = stringResource(R.string.leaderboard_create),
@@ -214,6 +224,31 @@ private fun BoardListScreen(
             onDismiss = { showCreateDialog = false },
         )
     }
+}
+
+/** 榜单列表顶部的一行同步状态：只在同步过或正在同步时出现，失败可点重试。 */
+@Composable
+private fun SyncStatusLine(state: SyncUiState, onRetry: () -> Unit) {
+    val colors = LocalEchoColors.current
+    val result = state.result
+    if (!state.running && result == null) return
+
+    val text = when {
+        state.running -> stringResource(R.string.sync_line_running)
+        result is SyncResult.Success -> stringResource(R.string.sync_line_done, DateFormats.time(state.atMs))
+        result is SyncResult.NotConfigured -> stringResource(R.string.sync_line_not_configured)
+        else -> stringResource(R.string.sync_line_failed)
+    }
+    val ok = state.running || result is SyncResult.Success
+    Text(
+        text = text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !ok && !state.running, onClick = onRetry)
+            .padding(vertical = 2.dp),
+        color = if (ok) colors.textSecondary else colors.danger,
+        fontSize = 11.sp,
+    )
 }
 
 @Composable
