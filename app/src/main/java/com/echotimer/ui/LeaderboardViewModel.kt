@@ -10,6 +10,7 @@ import com.echotimer.core.leaderboard.CreateBoardResult
 import com.echotimer.core.leaderboard.Leaderboard
 import com.echotimer.core.leaderboard.LeaderboardEntry
 import com.echotimer.core.leaderboard.LeaderboardRules
+import com.echotimer.core.leaderboard.OvertakeTracker
 import com.echotimer.core.leaderboard.SubmitResult
 import com.echotimer.core.leaderboard.ScoreOutcome
 import com.echotimer.core.settings.SettingsRepository
@@ -24,8 +25,11 @@ import com.echotimer.core.voice.Announcer
 import com.echotimer.data.LeaderboardRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -51,6 +55,9 @@ data class ChallengeState(
 ) {
     val finished: Boolean get() = finishedMs != null
 }
+
+/** 挑战中的一次「超越」提示；[id] 单调递增，界面拿它做弹幕的 key 与去重。 */
+data class OvertakeNotice(val id: Long, val player: String, val bestMs: Long)
 
 /**
  * 天梯榜编排层。
@@ -93,6 +100,17 @@ class LeaderboardViewModel(
     private val engine = StopwatchEngine(clock)
     private val scheduler = AnnouncementScheduler()
     private var ticker: Job? = null
+
+    /**
+     * 超越提示用事件流而不是状态：弹幕是"发生一次就过去"的东西，
+     * 放进状态里会让旋转屏幕后重复播放一遍。
+     */
+    private val _overtakes = MutableSharedFlow<OvertakeNotice>(extraBufferCapacity = 16)
+    val overtakes: SharedFlow<OvertakeNotice> = _overtakes.asSharedFlow()
+    private var overtakeSeq = 0L
+
+    /** 挑战开始时按当时的榜单快照建好，挑战过程中不受同步/删改影响。 */
+    private var overtakeTracker: OvertakeTracker? = null
 
     init {
         viewModelScope.launch { repository.refresh() }
@@ -171,7 +189,6 @@ class LeaderboardViewModel(
                 _route.value = LeaderboardRoute.List
             }
             scheduleAutoSync()
-            scheduleAutoSync()
         }
     }
 
@@ -182,6 +199,12 @@ class LeaderboardViewModel(
         val settings = settingsRepository.settings.value
         scheduler.setInterval(settings.announcementIntervalSeconds)
         scheduler.reset()
+
+        // 按开始那一刻的榜单快照判定，避免挑战途中同步进来的成绩突然插队。
+        overtakeTracker = OvertakeTracker(
+            entries = repository.entries.value.filter { it.boardId == board.id },
+            selfName = player,
+        )
 
         engine.start()
         _challenge.value = ChallengeState(
@@ -227,6 +250,8 @@ class LeaderboardViewModel(
 
         val total = engine.finish()
         stopTicker()
+        // 最后一次判定：可能在两个 tick 之间刚好越过一条记录。
+        emitOvertakes(total)
         if (settingsRepository.settings.value.speakStartAndStop) {
             announcer.speak("挑战结束，用时 ${ElapsedFormatter.spoken(total)}")
         }
@@ -240,15 +265,25 @@ class LeaderboardViewModel(
             val result = repository.submit(state.boardId, state.player, total)
             _challenge.value = _challenge.value?.copy(submitting = false, result = result)
             if (result.outcome != ScoreOutcome.KEPT) scheduleAutoSync()
-            if (result.outcome != ScoreOutcome.KEPT) scheduleAutoSync()
         }
     }
 
     fun discardChallenge() {
         stopTicker()
+        overtakeTracker = null
         engine.reset()
         announcer.stop()
         _challenge.value = null
+    }
+
+    /** 把新超过的对手转成弹幕事件；一次跳跃可能连发好几条。 */
+    private fun emitOvertakes(elapsedMs: Long) {
+        val tracker = overtakeTracker ?: return
+        for (target in tracker.poll(elapsedMs)) {
+            _overtakes.tryEmit(
+                OvertakeNotice(id = ++overtakeSeq, player = target.player, bestMs = target.bestMs),
+            )
+        }
     }
 
     /** 到点就报，只读数字（与计时页同一套规则）。 */
@@ -265,6 +300,7 @@ class LeaderboardViewModel(
             while (true) {
                 val elapsed = engine.elapsedMs()
                 _challenge.value = _challenge.value?.copy(elapsedMs = elapsed)
+                emitOvertakes(elapsed)
                 announceIfDue(elapsed)
                 delay(TICK_INTERVAL_MS)
             }

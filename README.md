@@ -5,7 +5,7 @@
 一个不依赖任何第三方 UI 库 / 依赖注入框架的秒表应用：计时过程中按你设定的时间点用语音报时，
 并且可以用「开始」「结束」这类口令直接控制计时。计时结果以多组记录的形式保存在本机。
 
-当前版本：1.6.0
+当前版本：1.7.0
 
 ---
 
@@ -45,6 +45,7 @@
 | 数据同步（可选） | 把榜单写到自己的 GitHub 仓库：读远端 → 双向合并 → 写回，成绩只增不减，内容没变化不产生提交；**榜单一变就自动同步** |
 | 网页展示 | 仓库里的 `docs/index.html` 直接读同步文件渲染榜单，可挂 GitHub Pages 或本地打开 |
 | 应用内更新 | 启动时自动检查 GitHub 发布页（一天一次，可关），发现新版本可就地下载 → SHA-256 校验 → 调起系统安装器；也可手动「检查更新」 |
+| 超越提示 | 挑战计时每超过榜上一条记录，屏幕顶部飞过一条弹幕「超越 张三 01:03.00」，不打断报时 |
 | 榜单分享 | 把整个榜单导出成一张 PNG（第一名皇冠、最后一名整行标红，配色跟随当前主题），可分享到任意应用或存进相册 |
 | 拟态界面 | 3 套配色（石墨 / 暖沙 / 雾青）× 明暗两态，全局切换立即生效 |
 | 关于页 | 应用名、版本号、技术栈、支持范围、权限说明 |
@@ -62,7 +63,7 @@
 | 数据 | 手写 `SQLiteOpenHelper` + 显式版本迁移（未使用 Room） |
 | 语音合成 | 系统 `TextToSpeech` |
 | 语音识别 | 系统 `SpeechRecognizer`（`RecognitionService`），或自研离线口令匹配 |
-| 测试 | JUnit4（185 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
+| 测试 | JUnit4（192 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
 
 版本号在构建脚本里只有一处定义（`app/build.gradle.kts` 的 `appVersionName` / `appVersionCode`），
 关于页通过 `BuildConfig` 读取；`tools/check_consistency.py` 会核对构建脚本、README 与关于页三者是否一致。
@@ -84,6 +85,7 @@
 | 拟态视觉 | 自研 `Modifier.neumorphicFace` | 多层低 alpha 圆角矩形叠加模拟软阴影，API 26 起表现一致 |
 | 主题系统 | 自研 `Palettes` + `CompositionLocal` | 3 套配色 × 明暗，单一入口全局生效 |
 | 图标 | 自研 `GlyphIcon` | Canvas 手绘，不引图标库 |
+| 超越提示 | 自研 `OvertakeTracker` | 升序游标 + 严格大于判定，一次跳跃补发全部，不重复不丢 |
 | 榜单分享图 | 自研 `LeaderboardPoster` | 用 `android.graphics` 按数据排版，不依赖截屏 API，长榜单也能整张导出 |
 | 榜单同步 | 自研 `SyncCodec` / `SyncMerger` | NDJSON 编解码与合并策略手写；只用 `HttpsURLConnection` 调 GitHub Contents API，不引 git 库 |
 | 应用内更新 | 自研 `UpdateCodec` / `UpdatePolicy` / `ApkInstaller` | 版本比较、检查节奏、下载与校验全部手写；不引更新框架，也不用 `DownloadManager` |
@@ -128,7 +130,7 @@ app/src/main/java/com/echotimer/
     ├── share/                   # 榜单分享图渲染（android.graphics）+ 分享/存相册
     ├── screens/                 # 计时 / 记录 / 天梯 / 挑战 / 设置 / 关于
     └── theme/                   # Compose 主题适配
-app/src/test/java/com/echotimer/ # 185 个 JVM 单测
+app/src/test/java/com/echotimer/ # 192 个 JVM 单测
 docs/index.html                  # 读同步文件渲染榜单的静态页（可挂 GitHub Pages）
 tools/
 ├── verify_migrations.py         # 用真实 sqlite3 验证迁移
@@ -342,6 +344,11 @@ CREATE INDEX idx_leaderboard_entries_board ON leaderboard_entries(board_id, best
   - 该姓名没有记录 → 新增；
   - 新成绩**严格大于**原记录 → 更新；
   - 否则保持原记录（页面会提示「未超过最佳」）。
+- **超越提示**：挑战过程中，每超过榜上一条记录就在表盘上方飞过一条弹幕（`超越 张三 01:03.00`）。
+  - 从**最小**的成绩开始逐个超过（榜单是越大越好），打平不算超越；
+  - 每个对手只提示一次；卡顿或切后台回来一次跨过好几个人时，会按顺序补发，不丢；
+  - 自己的旧成绩不提示（不弹「超越自己」）；对手名单在开始挑战时快照，挑战途中同步进来的新成绩不插队；
+  - 只是文字提示，**不发声**，不会打断定时播报。
 - 榜单成绩按 `best_ms` **降序**排列；同分时更新时间早的在前。
 - 列表里第一名带小皇冠，**最后一名整行标红**（行底色、姓名与成绩都用红色；只有一个人上榜时按第一名处理，不标红）。
 - 每条成绩可单独删除（右侧垃圾桶图标 + 二次确认），删除后榜单人数与最佳成绩同步刷新。
@@ -553,7 +560,7 @@ NDJSON，每行一个扁平 JSON 对象：
   - `OldTargetApi`：CI 镜像会随平台更新预装更新的 Android platform，而 lint 在"未使用最新 API"时报错，
     会让发版被环境升级卡住。这里忽略该检查（项目当前 targetSdk = 36），改版时按需手动检查目标 API。
 
-### 单元测试（185 个，全部通过）
+### 单元测试（192 个，全部通过）
 
 | 测试类 | 用例数 | 覆盖点 |
 | --- | --- | --- |
@@ -578,6 +585,7 @@ NDJSON，每行一个扁平 JSON 对象：
 | `VoiceEngineResolverTest` | 5 | 自动/系统/离线三种偏好的完整组合 |
 | `VoiceSettingsCodecTest` | 6 | 引擎与灵敏度往返、脏数据回落、默认值、sanitize 保留 |
 | `LeaderboardPermissionTest` | 2 | 榜单默认只读、sanitize 保留修改权限 |
+| `OvertakeTrackerTest` | 7 | 由小到大逐个超越、跳跃补发、不重复、打平不算、跳过自己、reset、空榜 |
 | `JsonTest` | 7 | 转义往返、字符串/数字/布尔、嵌套对象/数组、非法输入、\u 转义 |
 | `SyncCodecTest` | 6 | NDJSON 往返、中文与引号、坏行跳过、未知类型、空输入、脏记录过滤 |
 | `SyncMergerTest` | 7 | 双向合并、取更好成绩、名称大小写、孤儿成绩补榜单、幂等、内容等价、非法记录 |
@@ -644,7 +652,7 @@ PASS  删除榜单时级联删除成绩
 **已验证**
 
 - 编译（debug / release）、Kotlin 零警告、lint 零问题
-- 185 个单元测试全部通过
+- 192 个单元测试全部通过
 - 真实 `sqlite3` 上的迁移与数据保留、级联删除
 - release APK 构建、签名、清单与权限核对（两条签名通道 + CI 缺签名保护）
 
@@ -697,6 +705,16 @@ PASS  删除榜单时级联删除成绩
 ---
 
 ## 变更记录
+
+### v1.7.0
+
+- 天梯挑战新增**超越提示弹幕**：计时每超过榜上一条记录，表盘上方飞过一条
+  「超越 张三 01:03.00」，从最小的成绩开始逐个超越，打平不算。
+- 判定放在 ViewModel 的 tick 里，跨过即触发（不等下一次报时）；一次跨过多条会按顺序补发，
+  每个对手只提示一次；自己的旧成绩不提示；对手名单在开始挑战时快照。
+- 弹幕只是文字，不发声、不打断定时播报；三条轨道交替，互不重叠。
+- 新增 `OvertakeTrackerTest`，单测 185 → 192。
+- 版本号 1.7.0（versionCode 13）。
 
 ### v1.6.0
 

@@ -59,9 +59,11 @@ import com.echotimer.core.sync.SyncResult
 import com.echotimer.core.time.ElapsedFormatter
 import com.echotimer.core.time.TimeInputParser
 import com.echotimer.ui.ChallengeState
+import com.echotimer.ui.OvertakeNotice
 import com.echotimer.ui.DateFormats
 import com.echotimer.ui.LeaderboardRoute
 import com.echotimer.ui.SyncUiState
+import kotlinx.coroutines.flow.SharedFlow
 import com.echotimer.ui.components.DialogBodyText
 import com.echotimer.ui.components.DialogErrorText
 import com.echotimer.ui.components.Glyph
@@ -92,6 +94,8 @@ fun LeaderboardTab(
     entries: List<LeaderboardEntry>,
     route: LeaderboardRoute,
     challenge: ChallengeState?,
+    /** 挑战中「超越某人」的事件流，渲染成弹幕。 */
+    overtakes: SharedFlow<OvertakeNotice>,
     /** 是否允许改榜单数据（手工录入 / 删除）；关闭时只读。 */
     editable: Boolean,
     /** 同步状态，显示在榜单列表顶部。 */
@@ -113,6 +117,7 @@ fun LeaderboardTab(
     if (activeChallenge != null) {
         ChallengeScreen(
             state = activeChallenge,
+            overtakes = overtakes,
             onTogglePause = onTogglePause,
             onFinish = onFinishChallenge,
             onExit = onDiscardChallenge,

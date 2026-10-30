@@ -157,6 +157,7 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
                     entries = boardEntries,
                     route = boardRoute,
                     challenge = challenge,
+                    overtakes = leaderboardViewModel.overtakes,
                     editable = settings.leaderboardEditable,
                     syncState = syncState,
                     onSync = leaderboardViewModel::syncNow,

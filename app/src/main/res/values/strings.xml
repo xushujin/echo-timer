@@ -155,6 +155,7 @@
     <string name="challenge_pause">暂停</string>
     <string name="challenge_resume">继续</string>
     <string name="challenge_finish">结束</string>
+    <string name="challenge_overtake">超越 %1$s</string>
     <string name="challenge_hint">本模式不计次</string>
     <string name="challenge_submitting">正在保存…</string>
     <string name="challenge_result_new">新纪录！%1$s</string>
