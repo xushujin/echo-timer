@@ -1,4 +1,4 @@
-{"type":"meta","version":1,"updatedAt":1793332420177}
+{"type":"meta","version":1,"updatedAt":1793354175926}
 {"type":"board","name":"单杠悬垂","createdAt":1792578415852}
 {"type":"entry","board":"单杠悬垂","player":"陈明炳","bestMs":100046,"updatedAt":1793090981216}
 {"type":"entry","board":"单杠悬垂","player":"李爱光","bestMs":92006,"updatedAt":1793073101739}
@@ -14,3 +14,4 @@
 {"type":"entry","board":"单杠悬垂","player":"方总","bestMs":41339,"updatedAt":1793008507919}
 {"type":"entry","board":"单杠悬垂","player":"林励行","bestMs":35690,"updatedAt":1793007135330}
 {"type":"entry","board":"单杠悬垂","player":"高振","bestMs":27107,"updatedAt":1793073359410}
+{"type":"entry","board":"单杠悬垂","player":"陈浩景","bestMs":7614,"updatedAt":1793354170984}
