@@ -8,6 +8,7 @@ import com.echotimer.core.voice.Announcer
 import com.echotimer.core.voice.TtsAnnouncer
 import com.echotimer.core.voice.VoiceSourceFactory
 import com.echotimer.core.sync.LeaderboardSyncManager
+import com.echotimer.core.update.UpdateManager
 import com.echotimer.core.voice.offline.OfflineVoiceStore
 import com.echotimer.data.HistoryRepository
 import com.echotimer.data.LeaderboardRepository
@@ -35,6 +36,11 @@ class AppContainer(context: Context) {
     /** 榜单同步：本地 ↔ GitHub 仓库里的 NDJSON 文件。 */
     val syncManager: LeaderboardSyncManager by lazy {
         LeaderboardSyncManager(settingsRepository, leaderboardRepository)
+    }
+
+    /** 应用内更新：检查 GitHub 发布页 → 下载 → 校验 → 调起系统安装器。 */
+    val updateManager: UpdateManager by lazy {
+        UpdateManager(appContext, settingsRepository)
     }
 
     /** 单调时钟：SystemClock.elapsedRealtime 不受系统时间调整影响。 */

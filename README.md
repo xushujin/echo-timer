@@ -5,7 +5,7 @@
 一个不依赖任何第三方 UI 库 / 依赖注入框架的秒表应用：计时过程中按你设定的时间点用语音报时，
 并且可以用「开始」「结束」这类口令直接控制计时。计时结果以多组记录的形式保存在本机。
 
-当前版本：1.5.1
+当前版本：1.6.0
 
 ---
 
@@ -20,6 +20,8 @@
 - [发版流程（打 tag 自动发布）](#发版流程打-tag-自动发布)
 - [数据与迁移](#数据与迁移)
 - [播报规则](#播报规则)
+- [数据同步与网页（可选）](#数据同步与网页可选)
+- [应用内更新](#应用内更新)
 - [语音指令规则](#语音指令规则)
 - [权限](#权限)
 - [质量与验证](#质量与验证)
@@ -42,6 +44,7 @@
 | 榜单只读 | 设置里「允许修改榜单」默认关闭：关闭时不能手工录入、不能删除成绩或榜单，成绩只能靠真实挑战产生（新建榜单与挑战不受影响） |
 | 数据同步（可选） | 把榜单写到自己的 GitHub 仓库：读远端 → 双向合并 → 写回，成绩只增不减，内容没变化不产生提交；**榜单一变就自动同步** |
 | 网页展示 | 仓库里的 `docs/index.html` 直接读同步文件渲染榜单，可挂 GitHub Pages 或本地打开 |
+| 应用内更新 | 启动时自动检查 GitHub 发布页（一天一次，可关），发现新版本可就地下载 → SHA-256 校验 → 调起系统安装器；也可手动「检查更新」 |
 | 榜单分享 | 把整个榜单导出成一张 PNG（第一名皇冠、最后一名整行标红，配色跟随当前主题），可分享到任意应用或存进相册 |
 | 拟态界面 | 3 套配色（石墨 / 暖沙 / 雾青）× 明暗两态，全局切换立即生效 |
 | 关于页 | 应用名、版本号、技术栈、支持范围、权限说明 |
@@ -59,7 +62,7 @@
 | 数据 | 手写 `SQLiteOpenHelper` + 显式版本迁移（未使用 Room） |
 | 语音合成 | 系统 `TextToSpeech` |
 | 语音识别 | 系统 `SpeechRecognizer`（`RecognitionService`），或自研离线口令匹配 |
-| 测试 | JUnit4（158 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
+| 测试 | JUnit4（185 个 JVM 单测）+ 真实 `sqlite3` 迁移验证脚本 |
 
 版本号在构建脚本里只有一处定义（`app/build.gradle.kts` 的 `appVersionName` / `appVersionCode`），
 关于页通过 `BuildConfig` 读取；`tools/check_consistency.py` 会核对构建脚本、README 与关于页三者是否一致。
@@ -83,6 +86,7 @@
 | 图标 | 自研 `GlyphIcon` | Canvas 手绘，不引图标库 |
 | 榜单分享图 | 自研 `LeaderboardPoster` | 用 `android.graphics` 按数据排版，不依赖截屏 API，长榜单也能整张导出 |
 | 榜单同步 | 自研 `SyncCodec` / `SyncMerger` | NDJSON 编解码与合并策略手写；只用 `HttpsURLConnection` 调 GitHub Contents API，不引 git 库 |
+| 应用内更新 | 自研 `UpdateCodec` / `UpdatePolicy` / `ApkInstaller` | 版本比较、检查节奏、下载与校验全部手写；不引更新框架，也不用 `DownloadManager` |
 | 数据层 | 自研 `EchoDb` + `Migrations` | 显式迁移，缺失迁移直接抛异常 |
 | 语音合成 | 系统 `TextToSpeech` | 平台能力；调度与文本生成是自研的 |
 | 语音识别 | 系统 `SpeechRecognizer` | 平台能力，仅作"声音 → 文本"输入；文本如何变成动作是自研的 |
@@ -102,6 +106,7 @@ app/src/main/java/com/echotimer/
 │   ├── leaderboard/             # 天梯榜模型与规则（纯函数）
 │   ├── share/                   # 分享图版面常量与文件名规则（纯函数）
 │   ├── sync/                    # 榜单同步：NDJSON 编解码、双向合并、GitHub Contents API
+│   ├── update/                  # 应用内更新：版本比较、发布信息解析、下载校验、安装
 │   ├── settings/                # 设置模型、序列化、唯一读写入口
 │   ├── theme/                   # 配色规格（纯数据，可单测对比度）
 │   ├── time/                    # 秒表内核、播报调度、时间格式化
@@ -123,7 +128,7 @@ app/src/main/java/com/echotimer/
     ├── share/                   # 榜单分享图渲染（android.graphics）+ 分享/存相册
     ├── screens/                 # 计时 / 记录 / 天梯 / 挑战 / 设置 / 关于
     └── theme/                   # Compose 主题适配
-app/src/test/java/com/echotimer/ # 158 个 JVM 单测
+app/src/test/java/com/echotimer/ # 185 个 JVM 单测
 docs/index.html                  # 读同步文件渲染榜单的静态页（可挂 GitHub Pages）
 tools/
 ├── verify_migrations.py         # 用真实 sqlite3 验证迁移
@@ -422,6 +427,37 @@ NDJSON，每行一个扁平 JSON 对象：
 - 换仓库/分支不用改代码，用查询参数即可：
   `?repo=owner/name&branch=main&path=echotimer/leaderboard.ndjson`。
 
+## 应用内更新
+
+发布走 GitHub Release，更新也读同一个来源，不引第三方更新 SDK。
+
+| 环节 | 做法 |
+| --- | --- |
+| 检查 | `GET /repos/xushujin/echo-timer/releases/latest`；被限流时回退到 `releases.atom`。只用 `HttpsURLConnection` |
+| 版本比较 | tag（`v1.6.0`）解析成 `主.次.修` 后按数值比较；`-debug`、`+build` 后缀忽略 |
+| 节奏 | 启动时检查，**一天最多一次**；设置里可关。手动「检查更新」随时可用 |
+| 下载 | 下到 `cache/updates/`，显示百分比进度；不申请存储权限 |
+| 校验 | 发布页的 `.apk.sha256` 比对 → APK 包名必须一致 → versionCode 必须更大（防降级） |
+| 安装 | `FileProvider` 给出 `content://`，`ACTION_VIEW` 调起系统安装器 |
+
+**为什么要 Atom 兜底**：未认证的 GitHub API 每小时只有 60 次配额，而且按**出口 IP** 计算——
+移动网络共用运营商 NAT 时，这 60 次可能被同网段的其他人吃光。Atom 是普通网页，没有这个配额，
+所以 API 返回 403/429 或解析失败时会自动再试一次 Atom，代价只是拿不到附件大小、下载地址按发布规则拼出来。
+
+几个刻意的选择：
+
+- **不静默安装**：Android 不允许，也没有意义——用户要看到系统的安装确认页；
+- **不用 `DownloadManager`**：它把文件放在系统下载目录，安装时 `content://downloads/...` 在部分 ROM 上
+  拿不到读权限（表现为"解析安装包失败"），自己下到缓存目录更可控；
+- **点「稍后」只跳过当前版本**：记在 `skippedUpdateVersion` 里，自动检查不再弹窗，但设置页仍显示"有新版本"，
+  下一个版本发布后会重新提醒；
+- **失败不打扰**：自动检查失败只在设置页留一行原因，不弹窗；下载失败会在弹窗里给出具体原因并可重试。
+
+首次更新会跳一次系统的「允许安装未知应用」授权页（`REQUEST_INSTALL_PACKAGES`），
+授权后回到应用再点一次「下载并安装」即可。
+
+---
+
 ## 语音指令规则
 
 有两种引擎，设置页可切换（默认「自动」）：
@@ -497,7 +533,8 @@ NDJSON，每行一个扁平 JSON 对象：
 | 权限 | 用途 |
 | --- | --- |
 | `RECORD_AUDIO` | 语音指令。系统识别模式只把音频交给系统服务；离线模式只在本机提取特征做匹配。两种模式都不保存音频、不上传音频 |
-| `INTERNET` | 系统语音识别服务进行在线识别时需要联网；应用本身不上传任何数据 |
+| `INTERNET` | 系统语音识别在线识别、可选的榜单同步、检查应用更新需要联网。应用不上传任何用户数据，同步只写你自己配置的仓库 |
+| `REQUEST_INSTALL_PACKAGES` | 应用内更新：把新版本 APK 下到应用自己的缓存目录，校验通过后调起系统安装器。不申请存储权限，也不静默安装 |
 
 清单中还有一条由 AndroidX 自动合并的 `com.echotimer.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`（应用私有签名级权限，非用户可见权限）。
 
@@ -516,7 +553,7 @@ NDJSON，每行一个扁平 JSON 对象：
   - `OldTargetApi`：CI 镜像会随平台更新预装更新的 Android platform，而 lint 在"未使用最新 API"时报错，
     会让发版被环境升级卡住。这里忽略该检查（项目当前 targetSdk = 36），改版时按需手动检查目标 API。
 
-### 单元测试（158 个，全部通过）
+### 单元测试（185 个，全部通过）
 
 | 测试类 | 用例数 | 覆盖点 |
 | --- | --- | --- |
@@ -541,12 +578,15 @@ NDJSON，每行一个扁平 JSON 对象：
 | `VoiceEngineResolverTest` | 5 | 自动/系统/离线三种偏好的完整组合 |
 | `VoiceSettingsCodecTest` | 6 | 引擎与灵敏度往返、脏数据回落、默认值、sanitize 保留 |
 | `LeaderboardPermissionTest` | 2 | 榜单默认只读、sanitize 保留修改权限 |
-| `JsonTest` | 6 | 转义往返、字符串/数字/布尔、跳过嵌套对象、非法输入、\u 转义 |
+| `JsonTest` | 7 | 转义往返、字符串/数字/布尔、嵌套对象/数组、非法输入、\u 转义 |
 | `SyncCodecTest` | 6 | NDJSON 往返、中文与引号、坏行跳过、未知类型、空输入、脏记录过滤 |
 | `SyncMergerTest` | 7 | 双向合并、取更好成绩、名称大小写、孤儿成绩补榜单、幂等、内容等价、非法记录 |
 | `SyncConfigTest` | 6 | 仓库地址归一化（URL / .git / SSH）、非法输入、默认分支与路径、缺项提示 |
 | `SyncPolicyTest` | 4 | 覆盖模式：空本地拒绝、有榜单/成绩可覆盖、默认关闭 |
 | `AutoSyncPolicyTest` | 4 | 自动同步开关、配置不完整不发请求、完整配置触发、防抖窗口 |
+| `AppVersionTest` | 7 | 普通版本 / v 前缀 / -debug 与 +build 后缀 / 缺段补 0 / 非法输入 / 数值比较 |
+| `UpdateCodecTest` | 12 | Release 响应解析（嵌套 assets）、草稿/预发布跳过、无 APK、说明清理与截断、体积格式、校验文件、Atom 兜底 |
+| `UpdatePolicyTest` | 7 | 只提示更新版本、自动检查开关与一天节流、时钟回拨、跳过版本、手动必弹 |
 
 ### 真实引擎验证（迁移）
 
@@ -577,8 +617,9 @@ PASS  删除榜单时级联删除成绩
 ### APK 产物验证
 
 - `apksigner verify`：`Verifies`，APK Signature Scheme v2 通过，签名者 1 个。
-- `aapt2 dump badging`：`package: com.echotimer versionCode='2' versionName='1.0.1'`，`targetSdkVersion:'36'`，
-  权限只有 `RECORD_AUDIO` 与 `INTERNET`（另有 AndroidX 自动合并的私有权限），启动 Activity 为 `com.echotimer.MainActivity`。
+- `aapt2 dump badging`：`package: com.echotimer versionCode='12' versionName='1.6.0'`，`targetSdkVersion:'36'`，
+  权限为 `RECORD_AUDIO`、`INTERNET`、`REQUEST_INSTALL_PACKAGES`（另有 AndroidX 自动合并的私有权限），
+  启动 Activity 为 `com.echotimer.MainActivity`。
 - 签名两条通道都已实测：`keystore.properties` 与 `ECHO_*` 环境变量分别产出的 APK 证书不同，
   证明取值来源确实切换了；CI 环境下缺签名材料时构建按预期失败。
 
@@ -603,7 +644,7 @@ PASS  删除榜单时级联删除成绩
 **已验证**
 
 - 编译（debug / release）、Kotlin 零警告、lint 零问题
-- 158 个单元测试全部通过
+- 185 个单元测试全部通过
 - 真实 `sqlite3` 上的迁移与数据保留、级联删除
 - release APK 构建、签名、清单与权限核对（两条签名通道 + CI 缺签名保护）
 
@@ -619,6 +660,8 @@ PASS  删除榜单时级联删除成绩
    中文字形、长姓名省略号、深色主题下的观感需要真机看，未在设备上验证。
 6. **相册保存**：走 MediaStore（Android 10+），未在真机上确认相册里能看到。
 7. **GitHub Actions 工作流**：已实际跑通（v1.0.0 发布成功），本文件记录的是当时那版的流水线。
+8. **应用内更新的安装链路**：检查 / 解析 / 版本比较 / 校验逻辑有单测，但"下载 → 调起系统安装器 →
+   系统确认覆盖安装"这一段必须在真机上走一遍；`REQUEST_INSTALL_PACKAGES` 的授权页在不同 ROM 上入口不同。
 
 **产品层面的限制**
 
@@ -630,7 +673,9 @@ PASS  删除榜单时级联删除成绩
   识别不准时可在训练弹窗里调灵敏度（并看「测试识别」显示的距离/门限）。
 - 离线识别会持续占用麦克风，耗电高于待机；长时间不用建议关掉语音指令开关。
 - 播报间隔为单选；"1s 和 10s 都播"这种组合当前不支持（已改为单选语义，避免歧义）。
-- 不支持数据导出/同步，卸载即清除。
+- 卸载即清除本地数据；需要跨设备时用可选的 GitHub 同步（删除不会同步过去，见「同步规则」）。
+- 应用内更新只认官方发布页（`xushujin/echo-timer`），且 debug 包（`com.echotimer.debug`）无法安装 release 包，
+  更新只对 release 安装包有效。
 - 天梯挑战不计次、不响应语音指令（独立于计时页的秒表），但**会按设定间隔报时**；榜单名与姓名上限 20 个字符。
 - 分享图最多画 40 行（更大的榜单会截断并注明总人数），单张 PNG 约 1–24 MB。
 - 天梯成绩"越大越好"：只有新成绩严格大于原记录才会更新。
@@ -652,6 +697,16 @@ PASS  删除榜单时级联删除成绩
 ---
 
 ## 变更记录
+
+### v1.6.0
+
+- 新增**应用内在线更新**：启动时自动检查 GitHub 发布页（一天最多一次，可在设置里关闭），
+  发现新版本后弹窗显示更新说明，点「下载并安装」就地下载 → SHA-256 校验 → 调起系统安装器。
+- 校验三道：发布页 `.sha256`、APK 包名、versionCode 必须更大（防降级）；任一不过就删包不安装。
+- 设置页新增「应用更新」卡片：当前版本、手动检查、自动检查开关、下载进度与失败原因、打开发布页。
+- 点「稍后」只跳过当前版本，自动检查不再打扰，但设置页仍可看到并手动更新。
+- 新增 27 个单测（版本比较、发布信息解析、Atom 兜底、检查策略、JSON 嵌套解析），总数 158 → 185。
+- 版本号 1.6.0（versionCode 12）。
 
 ### v1.5.1
 

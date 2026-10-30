@@ -1,11 +1,15 @@
 package com.echotimer.core.sync
 
 /**
- * 极简 JSON 工具：只处理"扁平对象"（键值对，值是字符串/数字/布尔/null）。
+ * 极简 JSON 工具。
  *
  * 为什么自己写：Android 的 `org.json` 在 JVM 单测里是空实现（调用即抛异常），
- * 而同步文件的编解码必须能被单测覆盖——它一旦写错，网页端就会解析失败。
- * 这里只支持同步文件用得到的子集，越界输入一律返回 null，不做容错猜测。
+ * 而同步文件与发布信息的解析必须能被单测覆盖——它们一旦写错，网页端或更新检查就会失效。
+ * 这里只支持用得到的子集，越界输入一律返回 null，不做容错猜测。
+ *
+ * 两种入口：
+ * - [parse] 保留嵌套结构（GitHub Releases 响应里的 `assets` 数组必须能读到）；
+ * - [parseFlatObject] 只要扁平对象，嵌套值统一替换成 [NULL]（同步文件用这种）。
  */
 object Json {
 
@@ -31,16 +35,32 @@ object Json {
         return builder.toString()
     }
 
-    /** 把扁平对象解析成 Map；不是合法扁平对象时返回 null。 */
+    /** 解析任意 JSON 值：对象 → Map，数组 → List，其余 → String / Long / Double / Boolean / [NULL]。 */
+    fun parse(text: String): Any? = Parser(text).parseValue()
+
+    /** 把对象解析成扁平 Map；嵌套的对象/数组统一记为 [NULL]，不是合法对象时返回 null。 */
     fun parseFlatObject(text: String): Map<String, Any>? {
-        val parser = Parser(text)
-        return parser.parseObject()
+        val root = parse(text) as? Map<*, *> ?: return null
+        val result = LinkedHashMap<String, Any>(root.size)
+        for ((key, value) in root) {
+            val name = key as? String ?: continue
+            result[name] = when (value) {
+                null, is Map<*, *>, is List<*> -> NULL
+                else -> value
+            }
+        }
+        return result
     }
 
     private class Parser(private val text: String) {
         private var index = 0
 
-        fun parseObject(): Map<String, Any>? {
+        fun parseValue(): Any? {
+            skipWhitespace()
+            return readValue()
+        }
+
+        private fun parseObject(): Map<String, Any>? {
             skipWhitespace()
             if (!consume('{')) return null
             val result = LinkedHashMap<String, Any>()
@@ -63,6 +83,25 @@ object Json {
             }
         }
 
+        private fun parseArray(): List<Any>? {
+            skipWhitespace()
+            if (!consume('[')) return null
+            val result = ArrayList<Any>()
+            skipWhitespace()
+            if (consume(']')) return result
+            while (true) {
+                skipWhitespace()
+                val value = readValue() ?: return null
+                result.add(value)
+                skipWhitespace()
+                when {
+                    consume(',') -> continue
+                    consume(']') -> return result
+                    else -> return null
+                }
+            }
+        }
+
         private fun readValue(): Any? {
             if (index >= text.length) return null
             return when (text[index]) {
@@ -70,11 +109,8 @@ object Json {
                 't' -> if (consumeWord("true")) true else null
                 'f' -> if (consumeWord("false")) false else null
                 'n' -> if (consumeWord("null")) NULL else null
-                '{', '[' -> {
-                    // 嵌套结构（GitHub API 响应里的 _links / git 等）不关心，跳过即可。
-                    if (skipNested()) NULL else null
-                }
-
+                '{' -> parseObject()
+                '[' -> parseArray()
                 else -> readNumber()
             }
         }
@@ -122,33 +158,6 @@ object Json {
             if (start == index) return null
             val raw = text.substring(start, index)
             return raw.toLongOrNull() ?: raw.toDoubleOrNull()
-        }
-
-        /** 跳过一个完整的嵌套对象/数组（字符串里的括号不算）。 */
-        private fun skipNested(): Boolean {
-            var depth = 0
-            var inString = false
-            var escaped = false
-            while (index < text.length) {
-                val ch = text[index++]
-                if (inString) {
-                    when {
-                        escaped -> escaped = false
-                        ch == '\\' -> escaped = true
-                        ch == '"' -> inString = false
-                    }
-                    continue
-                }
-                when (ch) {
-                    '"' -> inString = true
-                    '{', '[' -> depth++
-                    '}', ']' -> {
-                        depth--
-                        if (depth == 0) return true
-                    }
-                }
-            }
-            return false
         }
 
         private fun consume(ch: Char): Boolean {

@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  分享榜单图片时把缓存目录里的 PNG 通过 content:// 交给其它应用。
-  只暴露 cache/shared，不暴露任何用户数据目录。
+  - shared：分享榜单图片时把缓存里的 PNG 通过 content:// 交给其它应用；
+  - updates：应用内更新下载的 APK，只用于交给系统安装器。
+  只暴露 cache 下的这两个子目录，不暴露任何用户数据目录。
 -->
 <paths>
     <cache-path name="shared" path="shared/" />
+    <cache-path name="updates" path="updates/" />
 </paths>

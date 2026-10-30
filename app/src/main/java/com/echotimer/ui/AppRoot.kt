@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,8 +40,12 @@ import com.echotimer.AppContainer
 import com.echotimer.R
 import com.echotimer.core.settings.AppSettings
 import com.echotimer.core.theme.Palettes
+import com.echotimer.core.update.UpdatePolicy
+import com.echotimer.core.update.UpdateState
+import com.echotimer.core.update.releaseInfo
 import com.echotimer.ui.components.Glyph
 import com.echotimer.ui.components.GlyphIcon
+import com.echotimer.ui.components.UpdateDialog
 import com.echotimer.ui.components.VoiceTrainingDialog
 import com.echotimer.ui.neumorph.NeumorphicSurface
 import com.echotimer.ui.screens.AboutScreen
@@ -91,6 +96,8 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
     val boardRoute by leaderboardViewModel.route.collectAsStateWithLifecycle()
     val challenge by leaderboardViewModel.challenge.collectAsStateWithLifecycle()
     val syncState by leaderboardViewModel.syncState.collectAsStateWithLifecycle()
+    val updateState by container.updateManager.state.collectAsStateWithLifecycle()
+    val currentVersionName = container.updateManager.currentVersionName
 
     val view = LocalView.current
     SideEffect {
@@ -105,6 +112,14 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
     }
 
     var showVoiceTraining by remember { mutableStateOf(false) }
+    // 用户点了「隐藏」：本次不弹，但设置页仍然能看到状态；换版本时重置。
+    var updateDialogHidden by remember { mutableStateOf(false) }
+    val updateInfo = updateState.releaseInfo
+    val updateVersion = updateInfo?.version
+    LaunchedEffect(updateVersion) { updateDialogHidden = false }
+
+    // 启动时按"一天一次"的节奏检查更新；不满足条件时完全不联网。
+    LaunchedEffect(Unit) { container.updateManager.checkIfDue() }
 
     BackHandler(enabled = currentTab != AppTab.TIMER) { tabName = AppTab.TIMER.name }
 
@@ -166,6 +181,10 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
                     offlineTemplates = timerState.offlineTemplates,
                     syncState = syncState,
                     onSync = leaderboardViewModel::syncNow,
+                    updateState = updateState,
+                    currentVersion = currentVersionName,
+                    onCheckUpdate = { container.updateManager.check(auto = false) },
+                    onOpenReleases = container.updateManager::openReleasesPage,
                     onOpenVoiceTraining = {
                         timerViewModel.setVoiceTrainingActive(true)
                         showVoiceTraining = true
@@ -176,6 +195,35 @@ private fun RootContent(container: AppContainer, settings: AppSettings, dark: Bo
             }
         }
         BottomBar(current = currentTab, onSelect = { tabName = it.name })
+    }
+
+    val promptUpdate = when (val current = updateState) {
+        // 自动检查时，用户点过「稍后」的版本不再弹；手动检查总是弹。
+        is UpdateState.Available -> UpdatePolicy.shouldPrompt(
+            version = current.info.version,
+            skippedVersion = settings.skippedUpdateVersion,
+            auto = current.auto,
+        )
+
+        is UpdateState.Failed -> current.info != null
+        is UpdateState.NeedsPermission,
+        is UpdateState.Downloading,
+        is UpdateState.Installing,
+        -> true
+
+        UpdateState.Idle, is UpdateState.Checking, is UpdateState.UpToDate -> false
+    }
+
+    if (promptUpdate && updateInfo != null && !updateDialogHidden) {
+        UpdateDialog(
+            state = updateState,
+            currentVersion = currentVersionName,
+            onDownload = container.updateManager::download,
+            onLater = { container.updateManager.dismiss(updateInfo) },
+            onHide = { updateDialogHidden = true },
+            onOpenPage = container.updateManager::openReleasesPage,
+            onRetry = container.updateManager::retry,
+        )
     }
 
     if (showVoiceTraining) {

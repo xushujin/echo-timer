@@ -80,6 +80,12 @@ data class AppSettings(
      * 默认关闭（默认是双向合并，谁的数据都不丢）。
      */
     val syncForceLocal: Boolean = false,
+    /** 启动时自动检查新版本（一天最多一次）。 */
+    val autoCheckUpdate: Boolean = true,
+    /** 上次检查更新的时间戳；0 表示从未检查。 */
+    val lastUpdateCheckAt: Long = 0L,
+    /** 用户点过「稍后」的版本，自动检查时不再弹窗。 */
+    val skippedUpdateVersion: String = "",
 ) {
 
     /** 归一化：非法值回落默认，保证从磁盘读到的脏数据不会把界面带崩。 */
@@ -90,6 +96,8 @@ data class AppSettings(
         recognitionLanguage = recognitionLanguage.takeIf { it.isNotBlank() } ?: "zh-CN",
         syncBranch = syncBranch.trim().ifBlank { "main" },
         syncPath = syncPath.trim().trim('/').ifBlank { DEFAULT_SYNC_PATH },
+        lastUpdateCheckAt = lastUpdateCheckAt.coerceAtLeast(0L),
+        skippedUpdateVersion = skippedUpdateVersion.trim(),
     )
 
     companion object {

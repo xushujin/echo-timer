@@ -145,6 +145,11 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 name = stringResource(R.string.about_perm_internet),
                 description = stringResource(R.string.about_perm_internet_desc),
             )
+            Spacer(Modifier.height(10.dp))
+            PermissionRow(
+                name = stringResource(R.string.about_perm_install),
+                description = stringResource(R.string.about_perm_install_desc),
+            )
         }
 
         Spacer(Modifier.height(14.dp))

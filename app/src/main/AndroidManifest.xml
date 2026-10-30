@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 系统语音识别服务做在线识别时需要网络。 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 应用内更新：下载新版本 APK 后调起系统安装器（不申请任何存储权限）。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android 11+ 包可见性：需要能看到系统语音识别与 TTS 服务。 -->
     <queries>

@@ -70,6 +70,10 @@ class SettingsRepository(context: Context) {
             syncPath = prefs.getString(KEY_SYNC_PATH, defaults.syncPath) ?: defaults.syncPath,
             syncToken = prefs.getString(KEY_SYNC_TOKEN, defaults.syncToken) ?: defaults.syncToken,
             syncForceLocal = prefs.getBoolean(KEY_SYNC_FORCE_LOCAL, defaults.syncForceLocal),
+            autoCheckUpdate = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, defaults.autoCheckUpdate),
+            lastUpdateCheckAt = prefs.getLong(KEY_LAST_UPDATE_CHECK, defaults.lastUpdateCheckAt),
+            skippedUpdateVersion = prefs.getString(KEY_SKIPPED_UPDATE, defaults.skippedUpdateVersion)
+                ?: defaults.skippedUpdateVersion,
         ).sanitized()
     }
 
@@ -93,6 +97,9 @@ class SettingsRepository(context: Context) {
             .putString(KEY_SYNC_PATH, settings.syncPath)
             .putString(KEY_SYNC_TOKEN, settings.syncToken)
             .putBoolean(KEY_SYNC_FORCE_LOCAL, settings.syncForceLocal)
+            .putBoolean(KEY_AUTO_CHECK_UPDATE, settings.autoCheckUpdate)
+            .putLong(KEY_LAST_UPDATE_CHECK, settings.lastUpdateCheckAt)
+            .putString(KEY_SKIPPED_UPDATE, settings.skippedUpdateVersion)
             .apply()
     }
 
@@ -116,5 +123,8 @@ class SettingsRepository(context: Context) {
         const val KEY_SYNC_PATH = "sync_path"
         const val KEY_SYNC_TOKEN = "sync_token"
         const val KEY_SYNC_FORCE_LOCAL = "sync_force_local"
+        const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
+        const val KEY_LAST_UPDATE_CHECK = "last_update_check_at"
+        const val KEY_SKIPPED_UPDATE = "skipped_update_version"
     }
 }

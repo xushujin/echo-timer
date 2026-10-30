@@ -65,4 +65,24 @@ class JsonTest {
         assertEquals("s", fields["sha"])
         assertNotNull(fields["tags"])
     }
+
+    @Test
+    fun parsesNestedStructures() {
+        // GitHub Releases 的 assets 是"数组套对象"，更新检查要靠它找安装包。
+        val body = """
+            {"tag_name":"v1.6.0",
+             "meta":{"draft":false},
+             "assets":[{"name":"a.apk","size":12},{"name":"b"}]}
+        """.trimIndent()
+        val root = Json.parse(body) as? Map<*, *>
+        requireNotNull(root)
+        assertEquals("v1.6.0", root["tag_name"])
+        assertEquals(false, (root["meta"] as Map<*, *>)["draft"])
+
+        val assets = root["assets"] as List<*>
+        assertEquals(2, assets.size)
+        val first = assets[0] as Map<*, *>
+        assertEquals("a.apk", first["name"])
+        assertEquals(12L, first["size"])
+    }
 }

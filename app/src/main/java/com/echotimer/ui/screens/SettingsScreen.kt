@@ -34,12 +34,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.echotimer.BuildConfig
 import com.echotimer.R
 import com.echotimer.core.settings.AppSettings
 import com.echotimer.core.settings.ThemeMode
 import com.echotimer.core.theme.PaletteSpec
 import com.echotimer.core.settings.VoiceEngine
 import com.echotimer.core.sync.SyncResult
+import com.echotimer.core.update.UpdateCodec
+import com.echotimer.core.update.UpdateState
 import com.echotimer.core.theme.Palettes
 import com.echotimer.core.voice.VoiceCommand
 import com.echotimer.ui.components.NeumorphicChip
@@ -72,6 +75,10 @@ fun SettingsScreen(
     onOpenVoiceTraining: () -> Unit,
     syncState: SyncUiState,
     onSync: () -> Unit,
+    updateState: UpdateState,
+    currentVersion: String,
+    onCheckUpdate: () -> Unit,
+    onOpenReleases: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalEchoColors.current
@@ -475,6 +482,65 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(14.dp))
 
+        // ---------------- 应用更新 ----------------
+        NeumorphicCard(modifier = Modifier.fillMaxWidth()) {
+            SectionTitle(stringResource(R.string.settings_section_update))
+            Spacer(Modifier.height(14.dp))
+            SettingRow(
+                title = stringResource(R.string.settings_update_current),
+                subtitle = stringResource(
+                    R.string.about_version,
+                    currentVersion,
+                    BuildConfig.VERSION_CODE,
+                ),
+                control = {
+                    NeumorphicChip(
+                        label = stringResource(
+                            if (updateState is UpdateState.Checking) {
+                                R.string.settings_update_checking
+                            } else {
+                                R.string.settings_update_check
+                            },
+                        ),
+                        selected = false,
+                        enabled = updateState !is UpdateState.Checking,
+                        onClick = onCheckUpdate,
+                    )
+                },
+            )
+            Spacer(Modifier.height(16.dp))
+            SettingRow(
+                title = stringResource(R.string.settings_update_auto),
+                subtitle = stringResource(R.string.settings_update_auto_sub),
+                control = {
+                    NeumorphicToggle(
+                        checked = settings.autoCheckUpdate,
+                        onCheckedChange = { enabled ->
+                            onUpdate(settings.copy(autoCheckUpdate = enabled))
+                        },
+                    )
+                },
+            )
+            val status = updateStatusText(updateState)
+            if (status != null) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = status.text,
+                    color = if (status.ok) colors.accent else colors.danger,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            NeumorphicChip(
+                label = stringResource(R.string.settings_update_open_page),
+                selected = false,
+                onClick = onOpenReleases,
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
         // ---------------- 其他 ----------------
         NeumorphicCard(modifier = Modifier.fillMaxWidth()) {
             SectionTitle(stringResource(R.string.settings_section_other))
@@ -626,3 +692,48 @@ private fun syncStatus(result: SyncResult): SyncStatusText = when (result) {
 }
 
 private data class SyncStatusText(val text: String, val ok: Boolean)
+
+/** 更新状态文案：可用/进行中用强调色，失败用危险色。 */
+@Composable
+private fun updateStatusText(state: UpdateState): SyncStatusText? = when (state) {
+    UpdateState.Idle -> null
+
+    is UpdateState.Checking -> SyncStatusText(
+        stringResource(R.string.settings_update_checking),
+        ok = true,
+    )
+
+    is UpdateState.UpToDate -> SyncStatusText(
+        stringResource(R.string.settings_update_status_latest),
+        ok = true,
+    )
+
+    is UpdateState.Available -> SyncStatusText(
+        stringResource(
+            R.string.settings_update_status_available,
+            state.info.version.toString(),
+            state.info.apk?.let { UpdateCodec.formatSize(it.sizeBytes) } ?: "—",
+        ),
+        ok = true,
+    )
+
+    is UpdateState.NeedsPermission -> SyncStatusText(
+        stringResource(R.string.settings_update_status_needs_permission),
+        ok = false,
+    )
+
+    is UpdateState.Downloading -> SyncStatusText(
+        stringResource(R.string.settings_update_status_downloading, (state.progress * 100).toInt()),
+        ok = true,
+    )
+
+    is UpdateState.Installing -> SyncStatusText(
+        stringResource(R.string.settings_update_status_installing),
+        ok = true,
+    )
+
+    is UpdateState.Failed -> SyncStatusText(
+        stringResource(R.string.settings_update_status_failed, state.message),
+        ok = false,
+    )
+}
