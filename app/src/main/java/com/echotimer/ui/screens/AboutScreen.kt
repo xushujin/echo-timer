@@ -1,5 +1,6 @@
 package com.echotimer.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,8 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,7 +24,6 @@ import com.echotimer.BuildConfig
 import com.echotimer.R
 import com.echotimer.ui.components.SectionTitle
 import com.echotimer.ui.components.NeumorphicCard
-import com.echotimer.ui.neumorph.NeumorphicSurface
 import com.echotimer.ui.theme.LocalEchoColors
 
 /**
@@ -51,22 +51,14 @@ fun AboutScreen(modifier: Modifier = Modifier) {
 
         NeumorphicCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                NeumorphicSurface(
+                // 与桌面图标同一枚：暖灰浮雕表盘 + 陶土指针，不再用字母占位。
+                Image(
+                    painter = painterResource(R.drawable.ic_brand),
+                    contentDescription = null,
                     modifier = Modifier
                         .width(64.dp)
                         .height(64.dp),
-                    cornerRadius = 20.dp,
-                    depth = 12.dp,
-                ) {
-                    Text(
-                        text = "E",
-                        modifier = Modifier.align(Alignment.Center),
-                        color = colors.accent,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                }
+                )
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text(

@@ -5,7 +5,7 @@
 一个不依赖任何第三方 UI 库 / 依赖注入框架的秒表应用：计时过程中按你设定的时间点用语音报时，
 并且可以用「开始」「结束」这类口令直接控制计时。计时结果以多组记录的形式保存在本机。
 
-当前版本：1.7.0
+当前版本：1.8.0
 
 ---
 
@@ -133,9 +133,31 @@ app/src/main/java/com/echotimer/
 app/src/test/java/com/echotimer/ # 192 个 JVM 单测
 docs/index.html                  # 读同步文件渲染榜单的静态页（可挂 GitHub Pages）
 tools/
+├── generate_icons.py            # 生成启动图标与品牌图（柔光拟态，可重复出图）
 ├── verify_migrations.py         # 用真实 sqlite3 验证迁移
 └── check_consistency.py         # 文档 / 构建脚本 / 代码一致性检查
 .github/workflows/release.yml    # 打 tag 触发构建并发布 Release
+```
+
+---
+
+## 图标
+
+启动图标按「柔光拟态 / 触感极简」重画：暖灰底材、同色系浮雕表盘、顶部小表冠、一根陶土色指针。
+
+- **只有一个光源**（左上）。体积全部由亮部与暗部塑造，没有描边、分割线或投影特效；
+- **低饱和近单色**，只有指针用一点陶土色；阴影用的是底材同色系的深色，不发灰；
+- **三层自适应图标**：`ic_launcher_background`（对角渐变的底材）、`ic_launcher_foreground`
+  （透明底浮雕元素，5 个密度档的 PNG）、`ic_launcher_monochrome`（Android 13+ 主题图标的剪影）；
+- 所有元素都在 108dp 画布的**安全区**内（表盘半径 25dp、整体高度 56dp），圆形/方形遮罩都不会切到；
+- 关于页的品牌位用同一枚图标的主体（不含底材），避免「框里套框」。
+
+图标不是手画的位图，而是由 `tools/generate_icons.py` 生成：几何、配色、光源方向、阴影强度都是脚本里的常量，
+改一个数就能整体重出各密度（含 `mipmap-*/ic_launcher.png` 与 `ic_launcher_round.png`）。
+脚本用 Pillow 做高斯模糊与渐变合成，不引入任何运行时依赖。
+
+```bash
+python3 tools/generate_icons.py   # 重新生成 app/src/main/res 下的图标
 ```
 
 ---
@@ -705,6 +727,16 @@ PASS  删除榜单时级联删除成绩
 ---
 
 ## 变更记录
+
+### v1.8.0
+
+- **重做启动图标**：改成柔光拟态风格——暖灰底材、同色系浮雕表盘、顶部小表冠、一根陶土色指针；
+  单一左上光源，无描边、无发光、无多重阴影，缩到 48px 仍能靠轮廓认出是秒表。
+- 自适应图标拆成三层：渐变底材（矢量）、浮雕前景（5 个密度档 PNG）、
+  主题图标剪影（矢量，Android 13+ 跟随系统取色）；`ic_launcher_round` 改为真正的圆形。
+- 关于页的品牌位换成同一枚图标的主体（原先是一个字母「E」的占位块）。
+- 新增 `tools/generate_icons.py`，图标由脚本按参数生成，改配色/几何后一条命令重出全部尺寸。
+- 版本号 1.8.0（versionCode 14）。
 
 ### v1.7.0
 
